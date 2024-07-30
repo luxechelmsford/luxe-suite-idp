@@ -1,0 +1,19 @@
+{
+  "name": "luxe-suit-idp",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/firebase": "^2.4.32",
+    "firebase-tools": "^13.14.2"
+  },
+  "dependencies": {
+    "firebase": "^10.12.4"
+  }
+}
