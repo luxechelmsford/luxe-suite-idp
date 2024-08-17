@@ -29,7 +29,6 @@ module.exports = {
     "quotes": ["error", "double"],
     "import/no-unresolved": 0,
     "indent": ["error", 2],
-    "max-len": ["error", {"code": 180}],
+    "max-len": ["error", 180],
   },
-  // project: path.join(__dirname, "tsconfig.eslint.json"),
 };
