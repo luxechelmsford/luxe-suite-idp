@@ -1,7 +1,7 @@
 // src/controllers/idTokenApp.ts
 
 import express from "express";
-import {verifyIdToken, getTokenClaims} from "../controllers/idToken"; // Import the unchanged verifyIdToken middleware
+import {getTokenClaims} from "../controllers/idToken"; // Import the unchanged verifyIdToken middleware
 
 // Initialize Express app
 const app = express();

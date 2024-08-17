@@ -69,3 +69,6 @@ node_modules/
 .dataconnect
 .DS_Store
 .DS_Store
+
+# configs
+/functions/src/configs/serviceAccountKey.json
