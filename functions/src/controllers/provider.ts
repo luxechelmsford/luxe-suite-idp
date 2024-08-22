@@ -4,10 +4,10 @@ import {database} from "../configs/firebase";
  * Searches for a provider ID based on the given subdomain.
  *
  * This function queries the Firebase Realtime Database to find a provider whose
- * `subDomian` field matches the provided subdomain value. It returns the `providerId`
+ * `subdomain` field matches the provided subdomain value. It returns the `providerId`
  * associated with the matched provider, or `null` if no match is found.
  *
- * @param {string} subdomain - The subdomain to search for within the `subDomian` field.
+ * @param {string} subdomain - The subdomain to search for within the `subdomain` field.
  * @return {Promise<string|null>} A promise that resolves to the `providerId` if a match is found,
  *                                  or `null` if no match is found.
  *
@@ -33,7 +33,8 @@ export async function findProviderIdBySubdomain(subdomain: string) : Promise<str
 
   try {
     // Query to find the matching subdomain
-    const snapshot = await ref.orderByChild("subDomian").equalTo(subdomain).once("value");
+    console.log(`Searching for subdomain |${subdomain}|`);
+    const snapshot = await ref.orderByChild("subdomain").equalTo(subdomain).once("value");
 
     // Check if the snapshot contains data
     if (snapshot.exists()) {
@@ -45,11 +46,11 @@ export async function findProviderIdBySubdomain(subdomain: string) : Promise<str
 
       return providerId;
     } else {
-      console.log("No matching subdomain found");
+      console.log(`No matching subdomain |${subdomain}| found`);
       return "";
     }
   } catch (error) {
-    console.error("Error fetching providerId:", error);
+    console.error(`Error fetching providerId for subdomain: |${subdomain}|`, error);
     return "";
   }
 }

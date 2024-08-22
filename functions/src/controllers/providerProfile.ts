@@ -32,16 +32,21 @@ export const createProviderProfile = async (req: Request, res: Response): Promis
     // first try from the header
     if (hostHeader) {
       // Extract the first subdomain as the providerId
-      const subDomain = hostHeader.split(".")[0];
+      const subdomain = hostHeader.split(".")[0];
 
       // find the provider id from the database using subdomain
-      providerId = await findProviderIdBySubdomain(subDomain);
+      providerId = await findProviderIdBySubdomain(subdomain);
     }
 
     // if we haven't found a valid providerId
     if (!providerId) {
       // Fallback to providerId in the request body
-      providerId = req.body.providerId;
+      const subdomainHeader = req.headers?.subdomain || "";
+      // Ensure 'subdomainHeader' is a string
+      const subdomain = Array.isArray(subdomainHeader) ? subdomainHeader[0] : subdomainHeader || "";
+
+      // find the provider id from the database using subdomain
+      providerId = await findProviderIdBySubdomain(subdomain);
 
       // Validate providerId against the Realtime Database
       const orgRef = database.ref(`/global/providers/${providerId}`);
@@ -80,7 +85,12 @@ export const createProviderProfile = async (req: Request, res: Response): Promis
 
         // Now fetch user and update their custom claims
         const user = await auth.getUser(uid);
-        const updatedClaims = user.customClaims || {providers: []};
+        const updatedClaims = {
+          ...user.customClaims, // Spread any existing custom claims
+          providers: user.customClaims?.providers || [], // Set providers to an empty array if not defined
+        };
+
+        console.debug(`Custom cliams read" |${JSON.stringify(updatedClaims)}|`);
 
         // find provider in the currentClaim with the same providerId
         //
