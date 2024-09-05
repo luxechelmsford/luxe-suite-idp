@@ -1,4 +1,4 @@
-import {database} from "../configs/firebase";
+import {idpDatabase} from "../configs/firebase";
 
 /**
  * Searches for a provider ID based on the given subdomain.
@@ -26,10 +26,10 @@ import {database} from "../configs/firebase";
  *   });
  */
 export async function findProviderIdBySubdomain(subdomain: string) : Promise<string> {
-  // Assuming you have Firebase initialized and a reference to the database
+  // Assuming you have Firebase initialized and a reference to the idpDatabase
 
   // Reference to the path where the data is stored
-  const ref = database.ref("/global/providers");
+  const ref = idpDatabase.ref("/global/providers");
 
   try {
     // Query to find the matching subdomain

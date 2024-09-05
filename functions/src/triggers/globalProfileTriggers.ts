@@ -1,12 +1,12 @@
 import * as functions from "firebase-functions";
-import {auth, database, defaultRegion} from "../configs/firebase"; // Import auth from configs/firebase
+import {idpAuth, idpDatabase, defaultRegion} from "../configs/firebase"; // Import idpAuth from configs/firebase
 import Lock from "../utils/lock";
 
 /**
  * Trigger function that fires when a new user is created in Firebase Authentication.
  * It creates a global profile for the user in the Realtime Database and logs the event.
  *
- * @param {functions.auth.UserRecord} user - The newly created user record.
+ * @param {functions.idpAuth.UserRecord} user - The newly created user record.
  * @returns {Promise<void>} - A promise that resolves when the profile is created and the event is logged.
  */
 export const onGlobalUserCreate = functions.region(defaultRegion).auth.user().onCreate(async (user) => {
@@ -22,7 +22,7 @@ export const onGlobalUserCreate = functions.region(defaultRegion).auth.user().on
     // define our update claims fucntion
     const registerUser = async () => {
       // Fetch the updated user data
-      const userRecord = await auth.getUser(uid);
+      const userRecord = await idpAuth.getUser(uid);
 
       const currentClaims = userRecord.customClaims || {};
 
@@ -35,18 +35,18 @@ export const onGlobalUserCreate = functions.region(defaultRegion).auth.user().on
       };
 
       // Create a global profile in Realtime Database
-      await database.ref(`/global/users/${uid}/`).set({
+      await idpDatabase.ref(`/global/users/${uid}/`).set({
         email: email,
         fullName: fullName,
         superAdmin: false, // Set default value for superAdmin
         profileURL: profileURL, // Use the profile URL from the user record
       });
 
-      await auth.setCustomUserClaims(uid, updatedClaims);
+      await idpAuth.setCustomUserClaims(uid, updatedClaims);
 
-      // Log user registration in the database
+      // Log user registration in the idpDatabase
       const timestamp = Date.now(); // Current timestamp in milliseconds
-      await database.ref(`/global/logs/users/${timestamp}/`).set({
+      await idpDatabase.ref(`/global/logs/users/${timestamp}/`).set({
         event: "userRegistered",
         uid: uid,
         emailId: email,
@@ -66,7 +66,7 @@ export const onGlobalUserCreate = functions.region(defaultRegion).auth.user().on
     } catch (error) {
       console.error("Failed to create global user profile", error);
       const timestamp = Date.now(); // Current timestamp in milliseconds
-      await database.ref(`/global/logs/errors/${timestamp}/`).set({
+      await idpDatabase.ref(`/global/logs/errors/${timestamp}/`).set({
         event: "userRegistrationFailed",
         uid: uid,
         emailId: email,
@@ -99,7 +99,7 @@ export const onGlobalProfileUpdate = functions.region(defaultRegion).database
 
     try {
       // Fetch the updated user data
-      const userRecord = await auth.getUser(uid);
+      const userRecord = await idpAuth.getUser(uid);
 
       // Determine if superAdmin flag has changed
       const oldSuperAdmin = before.superAdmin || false;
@@ -121,10 +121,10 @@ export const onGlobalProfileUpdate = functions.region(defaultRegion).database
           superAdmin: newSuperAdmin,
         };
 
-        await auth.setCustomUserClaims(uid, updatedClaims);
+        await idpAuth.setCustomUserClaims(uid, updatedClaims);
 
         // Log the event to /globals/logs/users/{timestamp}
-        await database.ref(`/global/logs/users/${timestamp}`).set({
+        await idpDatabase.ref(`/global/logs/users/${timestamp}`).set({
           event: "globalProfileUpdated",
           uid: uid,
           emailId: email,
@@ -144,7 +144,7 @@ export const onGlobalProfileUpdate = functions.region(defaultRegion).database
       } catch (error) {
         console.error("Failed to updated global user profile", error);
         const timestamp = Date.now(); // Current timestamp in milliseconds
-        await database.ref(`/global/logs/errors/${timestamp}/`).set({
+        await idpDatabase.ref(`/global/logs/errors/${timestamp}/`).set({
           event: "GlobalProfileUpdateFailed",
           uid: uid,
           emailId: email,

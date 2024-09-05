@@ -31,7 +31,7 @@ if (!admin.apps.find((appInstance) => isAppNamed(appInstance, "app"))) {
 }
 
 // Export the database references for both apps
-const auth = admin.auth(app);
-const database = admin.database(app);
+const idpAuth = admin.auth(app);
+const idpDatabase = admin.database(app);
 
-export {auth, database, defaultRegion, defaultOrganisationId};
+export {idpAuth, idpDatabase, defaultRegion, defaultOrganisationId};

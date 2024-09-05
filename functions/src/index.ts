@@ -1,38 +1,13 @@
-/*
-// import firebase fucntions must be before the app initialisation
-import * as v2 from "firebase-functions/v2";
-
-// then import fireabse.ts which has app initalisations etc
-// import {idpAuth, idpDatabase} from "../configs/firebase";
-//
-// then import anythign else
-import express from "express";
-import {onUserRegistered, onRealtimeDbUserCreated, onRealtimeDbUserUpdated, onRealtimeDbUserDeleted} from "./triggers/user-triggers";
-import {app as tokenClaimsApp} from "./controllers/token-claims.js";
-
-// Create "main" function to host all other top-level functions
-const api = express();
-api.use("/v1/tokenClaims", tokenClaimsApp);
-exports.api = v2.https.onRequest({region: "europe-west2"}, async (request, response) => {
-  api(request, response);
-});
-
-// Export the functions to FirebaseY
-exports.onUserRegistered = onUserRegistered;
-exports.onRealtimeDbUserCreated = onRealtimeDbUserCreated;
-exports.onRealtimeDbUserUpdated = onRealtimeDbUserUpdated;
-exports.onRealtimeDbUserDeleted = onRealtimeDbUserDeleted;
-*/
-
 // Import Firebase Functions and Express
 import * as v2 from "firebase-functions/v2";
-import express from "express";
+import express, {Request, Response, NextFunction} from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 
 // Import configuration and application setup
 import {defaultRegion} from "./configs/firebase";
-import {verifyIdToken} from "./controllers/idToken";
-import {app as idTokenApp} from "./apps/idTokenApp";
+import {Auth} from "./controllers/auth";
+import {app as idTokenClaimsApp} from "./apps/idTokenClaimsApp";
 import {app as providerProfileApp} from "./apps/providerProfileApp";
 
 // Import triggers
@@ -40,41 +15,78 @@ import {onGlobalUserCreate, onGlobalProfileUpdate} from "./triggers/globalProfil
 import {onProviderProfileUpdate, onUserProviderProfileDelete} from "./triggers/providerProfileTriggers";
 
 // Create the main Express application
-const api = express();
+const app = express();
 
-// Enable CORS
-api.use(cors({origin: true}));
-
-// Middleware to parse JSON request bodies
-api.use(express.json());
-
-// Support URL-encoded bodies
-express.urlencoded({extended: true});
-
-// Middleware to set additional CORS headers for all routes
-// todo remove before we going to production
-api.use((req, res, next) => {
-  res.set("Access-Control-Allow-Origin", "*"); // For testing purposes, allow all origins
-  res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+// Debugging middleware at the start before CORS
+app.use((req: Request, res: Response, next: NextFunction) => {
+  console.debug(`****************************Received |${req.method}| request for |${req.originalUrl}|`);
+  console.log("process.env.NODE_ENV === production:", process.env.NODE_ENV === "production", "|"); // Logs all cookies from the request
   next();
 });
 
+// Apply CORS middleware
+const allowedOrigins: string[] = process.env.NODE_ENV === "production" ?
+  ["https://backoffice.theluxestudio.co.uk", "https://luxe-suite-backoffice.web.app"] :
+  ["https://backoffice.theluxestudio.co.uk", "https://luxe-suite-backoffice.web.app", "http://backoffice.localhost.com"];
 
-// Apply the middleware function globally
-// so that the token in the header is verified and appened to the resposse object
-api.use(verifyIdToken);
+app.use(cors({
+  origin: function(origin, callback) {
+    if (allowedOrigins.indexOf(origin as string) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
 
-api.use("/v1/provider-profile", providerProfileApp);
-api.use("/v1/id-token", idTokenApp);
+  methods: ["GET", /* "HEAD", "PUT", "PATCH",*/ "POST", /* "DELETE",*/ "OPTIONS"], // Allow all methods
+  allowedHeaders: ["Accept", "Content-Type", /* "Range",*/ "Authorization", "X-CSRF-Token", "X-Subdomain"], // Specify allowed headers
+  credentials: true, // Allow credentials
+  exposedHeaders: ["Cache-Control", "Content-Language", "Content-Type", "Expires",
+    "Last-Modified", "Pragma", /* "X-Content-Range",*/ "X-CSRF-Token"], // Expose these headers
+}));
 
-// Export the API function
-exports.api = v2.https.onRequest({region: defaultRegion}, (request, response) => {
-  api(request, response);
+// Middleware configuration
+app.use(express.json()); // For parsing application/json
+app.use(cookieParser());
+
+// Handle preflight requests (OPTIONS) if needed
+app.options("*", cors({
+  origin: function(origin, callback) {
+    if (allowedOrigins.indexOf(origin as string) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
+
+// Middleware to log requests
+app.use((req, _res, next) => {
+  console.debug(`Received |${req.method}| request for |${req.originalUrl}|`);
+  next();
+});
+
+app.use(Auth.verifyIdToken);
+// app.use(Auth.applyCsrfProtection);
+
+app.use("/api/v1/id-token-claims", idTokenClaimsApp);
+app.use("/api/v1/provider-profile", providerProfileApp);
+
+// Export the Express app as a Firebase Cloud Function
+export const api = v2.https.onRequest({region: defaultRegion}, (req, res) => {
+  // corsMiddleware(req, res, async () => {
+  app(req, res);
+  console.debug(`++++++++++++++ Exiting |${req.method}| request for |${req.originalUrl}|`);
+  // )};
 });
 
 // Export triggers
-exports.onGlobalUserCreate = onGlobalUserCreate;
-exports.onGlobalProfileUpdate = onGlobalProfileUpdate;
-exports.onProviderProfileUpdate = onProviderProfileUpdate;
-exports.onUserProviderProfileDelete = onUserProviderProfileDelete;
+export {
+  onGlobalUserCreate,
+  onGlobalProfileUpdate,
+  onProviderProfileUpdate,
+  onUserProviderProfileDelete,
+};

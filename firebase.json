@@ -15,5 +15,35 @@
         "npm --prefix \"$RESOURCE_DIR\" run build"
       ]
     }
-  ]
+  ],
+  "emulators": {
+    "hosting": {
+      "enabled": true,
+      "port": 3002
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4002
+    },
+    "functions": {
+      "port": 5002
+    }
+  },
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/api/**",
+        "function": {
+          "functionId": "api",
+          "region": "europe-west2"
+        }
+      }
+    ]
+  }
 }

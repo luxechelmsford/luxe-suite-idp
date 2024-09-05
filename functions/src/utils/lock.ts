@@ -1,4 +1,4 @@
-import {database} from "../configs/firebase";
+import {idpDatabase} from "../configs/firebase";
 import admin from "firebase-admin";
 /**
  * Class to handle a locking mechanism using Firebase Realtime Database.
@@ -27,7 +27,7 @@ class Lock {
          * @type {Object}
          * @private
          */
-    this.lockRef = database.ref(`/global/locks/${uid}`);
+    this.lockRef = idpDatabase.ref(`/global/locks/${uid}`);
 
     /**
          * @type {number}
@@ -49,7 +49,7 @@ class Lock {
   }
 
   /**
-     * Acquires the lock by setting a timestamp in the database.
+     * Acquires the lock by setting a timestamp in the idpDatabase.
      * Continues retrying if the lock is currently held by someone else.
      *
      * @return {Promise<void>} - Resolves when the lock is successfully acquired.
@@ -77,7 +77,7 @@ class Lock {
   }
 
   /**
-     * Releases the lock by removing the lock node from the database.
+     * Releases the lock by removing the lock node from the idpDatabase.
      *
      * @return {Promise<void>} - Resolves when the lock is successfully released.
      * @throws {Error} - Throws an error if there is a problem releasing the lock.

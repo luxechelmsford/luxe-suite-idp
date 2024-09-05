@@ -1,8 +1,10 @@
 import {Request, Response} from "express";
-import {auth, database} from "../configs/firebase"; // Adjust the import path
-import {jsonString2Array} from "../definitions/helper";
+import {idpAuth, idpDatabase} from "../configs/firebase"; // Adjust the import path
+import {jsonString2Array} from "../utils/helper";
 import {findProviderIdBySubdomain} from "./provider";
 import Lock from "../utils/lock";
+import {ErrorCodes} from "../types/errorEx";
+import {FirebaseError} from "firebase-admin";
 
 
 /**
@@ -19,43 +21,60 @@ import Lock from "../utils/lock";
  */
 export const createProviderProfile = async (req: Request, res: Response): Promise<void> => {
   try {
-    const uid = req.currentDecodedToken?.uid; // Extract user ID from the authenticated user
+    // Extract the decoded token from the request, which would have been appended by the middleware call to 'verifyIdToken'
+    const uid = req.extendedDecodedIdToken?.uid; // Extract user ID from the authenticated user
     if (!uid) {
-      res.status(400).json({result: "failed", message: "No loggedin user detected."});
+      res.status(403).json({
+        status: "Failed",
+        code: ErrorCodes.AUTH_MISSING_CREDENTIALS,
+        message: "No credential found atatched to the request.",
+      });
       return;
     }
 
     // Read providerId from the Host header
-    const hostHeader = req.headers.host;
     let providerId = "";
+
+    // Extract the first subdomain form the headers
+    const hostHeader = req.headers.host || req.headers["Host"] || "";
+    const subdomaInHostHeader = (Array.isArray(hostHeader) ? hostHeader[0] : (hostHeader)).split(".")[0] || "";
+    const xSubdomainHeader = req.headers["X-Subdomain"] || req.headers["x-subdomain"] || "";
+    const xSubdomainInSubdomainHeader = (Array.isArray(xSubdomainHeader) ? xSubdomainHeader[0] : xSubdomainHeader) || "";
 
     // first try from the header
     if (hostHeader) {
       // Extract the first subdomain as the providerId
-      const subdomain = hostHeader.split(".")[0];
-
-      // find the provider id from the database using subdomain
-      providerId = await findProviderIdBySubdomain(subdomain);
+      // find the provider id from the idpDatabase using subdomain
+      providerId = await findProviderIdBySubdomain(subdomaInHostHeader);
     }
 
     // if we haven't found a valid providerId
     if (!providerId) {
-      // Fallback to providerId in the request body
-      const subdomainHeader = req.headers?.subdomain || "";
-      // Ensure 'subdomainHeader' is a string
-      const subdomain = Array.isArray(subdomainHeader) ? subdomainHeader[0] : subdomainHeader || "";
+      // Fallback to providerId in the request header
+      // find the provider id from the idpDatabase using subdomain
+      providerId = await findProviderIdBySubdomain(xSubdomainInSubdomainHeader);
+    }
 
-      // find the provider id from the database using subdomain
-      providerId = await findProviderIdBySubdomain(subdomain);
+    if (!providerId) {
+      res.status(403).json({
+        status: "Failed",
+        code: ErrorCodes.PROVIDER_ID_FAILURE,
+        message: `No provider ids in the host |${hostHeader}| and subdomain |${xSubdomainHeader}| headers  found in the request.`,
+      });
+      return;
+    }
 
-      // Validate providerId against the Realtime Database
-      const orgRef = database.ref(`/global/providers/${providerId}`);
-      const orgSnapshot = await orgRef.once("value");
+    // Validate providerId against the Realtime Database
+    const orgRef = idpDatabase.ref(`/global/providers/${providerId}`);
+    const orgSnapshot = await orgRef.once("value");
 
-      if (!orgSnapshot.exists()) {
-        res.status(400).json({result: "failed", message: "Invalid providerId."});
-        return;
-      }
+    if (!orgSnapshot.exists()) {
+      res.status(400).json({
+        status: "Failed",
+        code: ErrorCodes.PROVIDER_ID_FAILURE,
+        message: "Invalid providerId.",
+      });
+      return;
     }
 
     // Create an instance of the Lock class
@@ -64,7 +83,7 @@ export const createProviderProfile = async (req: Request, res: Response): Promis
     // define our create profile fucntion
     const createProfile = async () => {
       // Create the user profile in the Realtime Database
-      const userRef = database.ref(`/providers/${providerId}/users/${uid}`);
+      const userRef = idpDatabase.ref(`/providers/${providerId}/users/${uid}`);
 
       try {
         // Fetch the current user data
@@ -73,18 +92,18 @@ export const createProviderProfile = async (req: Request, res: Response): Promis
 
         // Check if attributes exist and update them if not
         const updatedData = {
-          fullName: currentData.fullName || req.currentDecodedToken?.name || "", // preserve full name or propogate from token
-          emailId: currentData.emailId || req.currentDecodedToken?.email || "", // preserve email or propogate from token
+          fullName: currentData.fullName || req.extendedDecodedIdToken?.name || "", // preserve full name or propogate from token
+          emailId: currentData.emailId || req.extendedDecodedIdToken?.email || "", // preserve email or propogate from token
           roles: currentData.roles || "[]", // preserve roles
           accessLevel: currentData.accessLevel || 0, // preserve access level
-          profileURL: req.currentDecodedToken?.picture || currentData.profileURL || "", // refresh profile URL
+          profileURL: req.extendedDecodedIdToken?.picture || currentData.profileURL || "", // refresh profile URL
         };
 
-        // Update the user data in the database
+        // Update the user data in the idpDatabase
         await userRef.update(updatedData);
 
         // Now fetch user and update their custom claims
-        const user = await auth.getUser(uid);
+        const user = await idpAuth.getUser(uid);
         const updatedClaims = {
           ...user.customClaims, // Spread any existing custom claims
           providers: user.customClaims?.providers || [], // Set providers to an empty array if not defined
@@ -112,11 +131,11 @@ export const createProviderProfile = async (req: Request, res: Response): Promis
         }
 
         // Update the user's custom claims in Firebase Authentication
-        await auth.setCustomUserClaims(uid, updatedClaims);
+        await idpAuth.setCustomUserClaims(uid, updatedClaims);
 
         // Log the event to /providers/{providerId}/logs/users/{timestamp}
         const timestamp = Date.now(); // Current timestamp in milliseconds
-        await database.ref(`/providers/${providerId}/logs/users/${timestamp}`).set({
+        await idpDatabase.ref(`/providers/${providerId}/logs/users/${timestamp}`).set({
           event: snapshot.exists() ? "providerProfileUpdatedManually" : "providerProfileCreated",
           providerIdUpdated: providerId,
           uid: uid,
@@ -128,11 +147,19 @@ export const createProviderProfile = async (req: Request, res: Response): Promis
           newClaims: JSON.stringify(updatedClaims) || "",
         });
 
-        res.status(200).json({result: "success", message: "User data updated successfully."});
+        res.status(200).json({
+          status: "Success",
+          code: "auth/success",
+          message: "User data updated successfully.",
+        });
         return;
       } catch (error) {
         console.error("Error updating user data:", error);
-        res.status(500).json({result: "failed", message: "Internal server error. " + (error as Error).message});
+        res.status(500).json({
+          status: "Failed",
+          code: (error as FirebaseError).code || ErrorCodes.SERVER_ERROR,
+          message: `Internal server error. Last Error |${(error as FirebaseError).message}|`,
+        });
         return;
       }
     };
@@ -145,7 +172,7 @@ export const createProviderProfile = async (req: Request, res: Response): Promis
     } catch (error) {
       console.log(`Failed to create profile for user [${uid}] for provider [${providerId}].`);
       const timestamp = Date.now(); // Current timestamp in milliseconds
-      await database.ref(`/global/logs/errors/${timestamp}/`).set({
+      await idpDatabase.ref(`/global/logs/errors/${timestamp}/`).set({
         event: "userProfileCreationFailed",
         uid: uid,
         providerId: providerId,
@@ -155,7 +182,11 @@ export const createProviderProfile = async (req: Request, res: Response): Promis
     }
   } catch (error) {
     console.error("Error updating provider user profile", error);
-    res.status(500).json({result: "failed", message: "Unable to update provider user profile. " + (error as Error).message});
+    res.status(500).json({
+      status: "Failed",
+      code: (error as FirebaseError).code || ErrorCodes.SERVER_ERROR,
+      message: `Unable to update provider user profile.. Last Error |${(error as FirebaseError).message}|`,
+    });
     return;
   }
 };

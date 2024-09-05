@@ -1,13 +1,15 @@
 {
   "name": "functions",
   "scripts": {
-    "lint": "eslint --ext .js,.ts .",
-    "build": "esbuild src/index.ts --bundle --platform=node --target=node14 --outdir=lib",
-    "build:watch": "esbuild src/index.ts --bundle --platform=node --target=node14 --outdir=lib --watch",
-    "deploy": "npm run build && firebase deploy --only functions",
+    "lint": "eslint --ext .js,.ts . --fix",
+    "build": "npm run lint && esbuild src/index.ts --bundle --platform=node --target=node14 --outdir=lib",
+    "build:watch": "npm run lint && esbuild src/index.ts --bundle --platform=node --target=node14 --outdir=lib --watch",
+    "build:debug": "npm run lint && esbuild src/index.ts --bundle --platform=node --target=node14 --outdir=lib --debug",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
+    "deploy": "npm run build && firebase deploy --only functions",
+    "deploy:debug": "npm run build && firebase deploy --debug --only functions",
     "logs": "firebase functions:log"
   },
   "engines": {
