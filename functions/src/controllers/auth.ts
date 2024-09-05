@@ -137,7 +137,7 @@ export class Auth {
         res.status(403).json({
           status: "failed",
           message: "Session cookie missing",
-          code: ErrorCodes.SESSION_COOKIE_MISSING_ID_TOKEN,
+          code: ErrorCodes.SESSION_COOKIE_MISSING_CSRF_COOKIE,
         });
         return;
       }
