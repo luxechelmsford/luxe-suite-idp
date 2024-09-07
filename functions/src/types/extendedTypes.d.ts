@@ -24,6 +24,7 @@ export interface ExtendedDecodedIdToken extends DecodedIdToken, CustomClaims {
 declare module "express-serve-static-core" {
   interface Request {
     idToken?: string; // Attach the id token to the request object
+    provider?: ProviderClaim;
     extendedDecodedIdToken?: ExtendedDecodedIdToken; // Attach the decoded token to the request object
   }
 }
