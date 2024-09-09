@@ -1,5 +1,5 @@
 import * as functions from "firebase-functions";
-import {idpAuth, idpDatabase, defaultRegion} from "../configs/firebase"; // Import idpAuth from configs/firebase
+import {auth, database, defaultRegion} from "../configs/firebase"; // Import auth from configs/firebase
 import {jsonString2Array} from "../utils/helper";
 import Lock from "../utils/lock";
 
@@ -7,7 +7,7 @@ import Lock from "../utils/lock";
  * Trigger function that fires when an provider's profile is updated in the Realtime Database.
  * It updates the user's claims for the specific provider while preserving other provider claims.
  *
- * @param {functions.Change<functions.idpDatabase.DataSnapshot>} change - Contains the data before and after the update.
+ * @param {functions.Change<functions.database.DataSnapshot>} change - Contains the data before and after the update.
  * @param {functions.context} context - Context object containing information about the trigger event.
  * @return {Promise<void>} - A promise that resolves when the function completes.
  */
@@ -26,7 +26,7 @@ export const onProviderProfileUpdate = functions.region(defaultRegion).database
       // define our update claims fucntion
       const updateProfile = async () => {
         // Fetch the user's current custom claims
-        const userRecord = await idpAuth.getUser(uid);
+        const userRecord = await auth.getUser(uid);
 
         // Extract relevant fields
         const email = userRecord.email || "N/A";
@@ -68,7 +68,7 @@ export const onProviderProfileUpdate = functions.region(defaultRegion).database
 
         // Log the event to /providers/${providerId}/logs/users/{timestamp}
         const timestamp = Date.now(); // Current timestamp in milliseconds
-        await idpDatabase.ref(`/providers/${providerId}/logs/users/${timestamp}`).set({
+        await database.ref(`/providers/${providerId}/logs/users/${timestamp}`).set({
           event: "providerProfileUpdatedAutomatically",
           providerIdUpdated: providerId,
           uid: uid,
@@ -81,10 +81,10 @@ export const onProviderProfileUpdate = functions.region(defaultRegion).database
         });
 
         // Update the user's custom claims in Firebase Authentication
-        await idpAuth.setCustomUserClaims(uid, updatedClaims);
+        await auth.setCustomUserClaims(uid, updatedClaims);
       };
 
-      // Now delete the claims in both idpDatabase and firebase admin in a single go
+      // Now delete the claims in both database and firebase admin in a single go
       try {
         // Use the performOperation method to execute the operation
         await lock.performOperation(updateProfile);
@@ -92,7 +92,7 @@ export const onProviderProfileUpdate = functions.region(defaultRegion).database
       } catch (error) {
         console.error(`Failed to update the claims for user [${uid}] after the user data updated by the provider [${providerId}].`);
         const timestamp = Date.now(); // Current timestamp in milliseconds
-        await idpDatabase.ref(`/global/logs/errors/${timestamp}/`).set({
+        await database.ref(`/global/logs/errors/${timestamp}/`).set({
           event: "providerProfileUpdateFailed",
           providerId: providerId,
           uid: uid,
@@ -112,7 +112,7 @@ export const onProviderProfileUpdate = functions.region(defaultRegion).database
    * Trigger function that fires when a user's provider profile is deleted in the Realtime Database.
    * It removes the provider's claims from the custom claims of that specific user.
    *
-   * @param {functions.Change<functions.idpDatabase.DataSnapshot>} change - Contains the data before and after the delete.
+   * @param {functions.Change<functions.database.DataSnapshot>} change - Contains the data before and after the delete.
    * @param {functions.context} context - Context object containing information about the trigger event.
    * @return {Promise<void>} - A promise that resolves when the function completes.
    */
@@ -130,7 +130,7 @@ export const onUserProviderProfileDelete = functions.region(defaultRegion).datab
       // define our update claims fucntion
       const deleteProfile = async () => {
         // Fetch the user's current custom claims
-        const userRecord = await idpAuth.getUser(uid);
+        const userRecord = await auth.getUser(uid);
 
         // Filter out the claims for the deleted provider
         const updatedClaims = userRecord.customClaims || {};
@@ -139,14 +139,14 @@ export const onUserProviderProfileDelete = functions.region(defaultRegion).datab
         );
 
         // Update the user's custom claims in Firebase Authentication
-        await idpAuth.setCustomUserClaims(uid, updatedClaims);
+        await auth.setCustomUserClaims(uid, updatedClaims);
 
         // Extract relevant fields
         const email = userRecord.email || "N/A";
         const fullName = userRecord.displayName || "N/A";
 
         // Log the event to /providers/${providerId}/logs/users/{timestamp}
-        await idpDatabase.ref(`/providers/${providerId}/logs/users/${timestamp}`).set({
+        await database.ref(`/providers/${providerId}/logs/users/${timestamp}`).set({
           event: "providerProfileDeleted",
           providerId: providerId,
           uid: uid,
@@ -160,7 +160,7 @@ export const onUserProviderProfileDelete = functions.region(defaultRegion).datab
         });
       };
 
-      // Now delete the claims in both idpDatabase and firebase admin in a single go
+      // Now delete the claims in both database and firebase admin in a single go
       try {
         // Use the performOperation method to execute the operation
         await lock.performOperation(deleteProfile);
@@ -168,7 +168,7 @@ export const onUserProviderProfileDelete = functions.region(defaultRegion).datab
       } catch (error) {
         console.log(`Failed to delete claims for user [${uid}] after the user data deleted by the provider [${providerId}].`);
         const timestamp = Date.now(); // Current timestamp in milliseconds
-        await idpDatabase.ref(`/global/logs/errors/${timestamp}/`).set({
+        await database.ref(`/global/logs/errors/${timestamp}/`).set({
           event: "providerProfileDeletionFailed",
           providerIdUpdated: providerId,
           uid: uid,

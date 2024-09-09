@@ -6,9 +6,9 @@ import cookieParser from "cookie-parser";
 
 // Import configuration and application setup
 import {defaultRegion} from "./configs/firebase";
-import {Auth} from "./controllers/auth";
-import {app as idTokenClaimsApp} from "./apps/idTokenClaimsApp";
-import {app as providerProfileApp} from "./apps/providerProfileApp";
+import {Auth} from "./middlewares/auth";
+import {app as authApp} from "./apps/authApp";
+import {app as providerApp} from "./apps/providerApp";
 
 // Import triggers
 import {onGlobalUserCreate, onGlobalProfileUpdate} from "./triggers/globalProfileTriggers";
@@ -71,9 +71,10 @@ app.use((req, _res, next) => {
 
 app.use(Auth.verifyIdToken);
 // app.use(Auth.applyCsrfProtection);
+app.use(Auth.validateProviderId);
 
-app.use("/api/v1/id-token-claims", idTokenClaimsApp);
-app.use("/api/v1/provider-profile", providerProfileApp);
+app.use("/api/v1/auth", authApp);
+app.use("/api/v1/provider", providerApp);
 
 // Export the Express app as a Firebase Cloud Function
 export const api = v2.https.onRequest({region: defaultRegion}, (req, res) => {

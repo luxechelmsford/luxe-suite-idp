@@ -19,14 +19,14 @@
   "emulators": {
     "hosting": {
       "enabled": true,
-      "port": 3002
+      "port": 3001
     },
     "ui": {
       "enabled": true,
-      "port": 4002
+      "port": 4001
     },
     "functions": {
-      "port": 5002
+      "port": 5001
     }
   },
   "hosting": {
@@ -41,6 +41,13 @@
         "source": "/api/**",
         "function": {
           "functionId": "api",
+          "region": "europe-west2"
+        }
+      },
+      {
+        "source": "/internalApi/**",
+        "function": {
+          "functionId": "internalApi",
           "region": "europe-west2"
         }
       }

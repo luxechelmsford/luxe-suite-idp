@@ -1,11 +1,10 @@
-import {Response} from "express";
-import {Request} from "../types/extendedTypes";
+import {Request, Response} from "express";
 
 /**
- * @class Auth
- * @classdesc Handles user login and logout using longlived cookies
+ * @class AuthController
+ * @classdesc handles Auth related web sevices end points
  */
-export class IdToken {
+export class AuthController {
   /**
    * Retrieves and returns the claims from the currently decoded token.
    * This method is intended to be used after the token has been decoded and
@@ -27,11 +26,12 @@ export class IdToken {
    */
   static async getClaims(req: Request, res: Response) {
     try {
-      console.debug("in getTokenClaims");
+      console.debug("in getClaims");
       // Access token claims from the middleware
-      const tokenClaims = req.extendedDecodedIdToken;
+      const tokenClaims = await req.extendedDecodedIdToken;
+      console.debug(`tokenClaims: |${JSON.stringify(tokenClaims)}|`);
 
-      res.status(200).send({
+      res.status(200).json({
         status: "Success",
         data: {
           tokenClaims: tokenClaims,
@@ -42,12 +42,16 @@ export class IdToken {
         code: "auth/success",
         message: "Token decoded successfully!",
       });
+      console.debug("get claims processed successfully");
+      return;
     } catch (error) {
-      res.status(500).send({
+      console.debug(`Failed get token claims Last error: |${JSON.stringify(error)}|`);
+      res.status(500).json({
         status: "Failed",
         data: {},
         message: (error as Error).message,
       });
+      return;
     }
   }
 }

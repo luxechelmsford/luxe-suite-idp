@@ -72,3 +72,4 @@ node_modules/
 
 # configs
 /functions/src/configs/serviceAccountKey.json
+/functions/src/configs/idpServiceAccountKey.json

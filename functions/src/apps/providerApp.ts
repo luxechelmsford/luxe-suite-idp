@@ -1,11 +1,11 @@
 import express from "express";
-import {createProviderProfile} from "../controllers/providerProfile"; // Import the function from users.ts
+import providerRouter from "../routers/providerRouter";
 
 // Initialize express application
 const app = express();
 
 // Define routes
-app.post("/", createProviderProfile);
+app.use("/", providerRouter);
 
 // Export the app to be used in other modules
 export {app};
