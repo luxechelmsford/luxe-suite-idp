@@ -374,6 +374,7 @@ export class Auth {
    * @param {NextFunction} next - The Express next function.
    */
   static async validateProviderId(req: Request, res: Response, next: NextFunction) {
+    let provider;
     try {
     // Get the host header and extract the subdomain as provider ID
       const hostHeader = req.headers.host;
@@ -412,7 +413,7 @@ export class Auth {
       }
 
       // now check that this users has this providerId in its cusotm claims
-      let provider = (req.extendedDecodedIdToken?.providers || []).find(
+      provider = (req.extendedDecodedIdToken?.providers || []).find(
         (item: {id: string}) => item.id === providerId
       );
 
@@ -437,11 +438,6 @@ export class Auth {
         return;
         */
       }
-
-      // attach the found provider to the request object
-      req.provider = provider;
-      console.debug(`Provider |${JSON.stringify(req.provider)}| attacjhed to the request at validateProviderId`);
-      next();
     } catch (error) {
       console.error(`Failed to validate provider id. Last Error: |${(error as Error).message}|`);
       res.status(400).json({
@@ -451,9 +447,11 @@ export class Auth {
       });
       return;
     }
-    // If reached here, we failed to attach provider id to the requesr
-    console.debug(`Failed to attach provider id  |${JSON.stringify(req.provider)}| to request at validateProviderId`);
-    return;
+
+    // attach the found provider to the request object
+    req.provider = provider;
+    console.debug(`Provider |${JSON.stringify(req.provider)}| attached to the request at validateProviderId`);
+    next();
   }
 
 
