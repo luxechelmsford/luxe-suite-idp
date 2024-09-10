@@ -1,4 +1,30 @@
-# Logs
+# Compiled JavaScript files
+functions/lib/**/*.js
+functions/**/*.js
+lib/**/*.js
+lib/**/*.js.map
+
+# TypeScript declaration files
+functions/typings/
+typings/
+
+# Node.js dependency directories
+functions/node_modules/
+node_modules/
+
+# Dependency lock files
+functions/package-lock.json
+package-lock.json
+
+# ESLint related files
+functions/node_modules/@eslint/
+node_modules/@eslint/
+
+# Globals and other dependency files
+functions/node_modules/globals/
+node_modules/globals/
+
+# Logs and temporary files
 logs
 *.log
 npm-debug.log*
@@ -68,8 +94,6 @@ node_modules/
 # dataconnect generated files
 .dataconnect
 .DS_Store
-.DS_Store
 
-# configs
-/functions/src/configs/serviceAccountKey.json
-/functions/src/configs/idpServiceAccountKey.json
+# service keys
+functions/src/configs/*.json

@@ -454,7 +454,9 @@ export class Auth {
    */
   static requiresRoleOrAccessLevel(requiredAccessLevel: number | null, requiredRoles: string[]): MethodDecorator {
     return function(target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor): PropertyDescriptor {
-      console.debug(`In requiresRoleOrAccessLevel for raget |${target}| with requiredAccessLevel |${requiredAccessLevel}| & requiredRoles: |${JSON.stringify(requiredRoles)}|`);
+      console.debug(
+        `In requiresRoleOrAccessLevel for target |${propertyKey.toString()}| with requiredAccessLevel |${requiredAccessLevel}| & requiredRoles: |${JSON.stringify(requiredRoles)}|`
+      );
 
       const originalMethod = descriptor.value;
 

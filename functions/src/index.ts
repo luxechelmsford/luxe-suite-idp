@@ -4,7 +4,6 @@ import express, {Request, Response, NextFunction} from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 
-// Import configuration and application setup
 import {defaultRegion} from "./configs/firebase";
 import {Auth} from "./middlewares/auth";
 import {app as authApp} from "./apps/authApp";
