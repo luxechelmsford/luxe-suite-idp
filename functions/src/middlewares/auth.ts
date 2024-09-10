@@ -374,7 +374,6 @@ export class Auth {
    * @param {NextFunction} next - The Express next function.
    */
   static async validateProviderId(req: Request, res: Response, next: NextFunction) {
-    let providerId = "";
     try {
     // Get the host header and extract the subdomain as provider ID
       const hostHeader = req.headers.host;
@@ -400,9 +399,10 @@ export class Auth {
       if (subdomainFromSubdomainHeader) subdomains.push(subdomainFromSubdomainHeader);
       if (subdomainFromHostHeader) subdomains.push(subdomainFromHostHeader);
 
-      providerId = await ProviderDataStore.findProviderIdBySubdomains(subdomains, req) || "";
+      const providerId = await ProviderDataStore.findProviderIdBySubdomains(subdomains, req) || "";
 
       if (!providerId) {
+        console.debug(`Subdomains |${JSON.stringify(subdomains)}| in the Host or X-Subdomain header cannnot be resolved to a provider id.`),
         res.status(400).json({
           status: "failed",
           code: ErrorCodes.PROVIDER_ID_FAILURE,
@@ -412,33 +412,47 @@ export class Auth {
       }
 
       // now check that this users has this providerId in its cusotm claims
-      const provider = (req.extendedDecodedIdToken?.providers || []).find(
+      let provider = (req.extendedDecodedIdToken?.providers || []).find(
         (item: {id: string}) => item.id === providerId
       );
 
+      console.debug(`searched for provider: !${JSON.stringify(req.extendedDecodedIdToken)})`);
+
       if (!provider) {
+        // it could be thatb we are trying to create the provider profile,
+        // lets give a default provcider profile with no role or accesslevel and let ot create the profile
+        provider = {
+          id: providerId,
+          admin: false,
+          roles: [],
+          accessLevel: 0,
+        };
+        /*
+        console.debug(`User does not have access to resources of this provider |${providerId}|`),
         res.status(403).json({
           status: "failed",
           code: ErrorCodes.PROVIDER_ID_FAILURE,
           message: `User does not have access to resources of this provider |${providerId}|`,
         });
         return;
+        */
       }
 
       // attach the found provider to the request object
       req.provider = provider;
+      console.debug(`Provider |${JSON.stringify(req.provider)}| attacjhed to the request at validateProviderId`);
+      next();
     } catch (error) {
-      console.error("Error validating provider ID:", error);
+      console.error(`Failed to validate provider id. Last Error: |${(error as Error).message}|`);
       res.status(400).json({
         status: "failed",
-        message: `Failed to validate provider id |${providerId}|. Last Error: |${(error as Error).message}|`,
+        message: `Failed to validate provider id. Last Error: |${(error as Error).message}|`,
         code: ErrorCodes.PROVIDER_ID_FAILURE,
       });
       return;
     }
-    // If valid, proceed to the next middleware or route handler
-    console.debug(`Provider |${JSON.stringify(req.provider)}| validated and attached to request at validateProviderId`);
-    next();
+    // If reached here, we failed to attach provider id to the requesr
+    console.debug(`Failed to attach provider id  |${JSON.stringify(req.provider)}| to request at validateProviderId`);
     return;
   }
 
@@ -470,7 +484,7 @@ export class Auth {
         const currentAccessLevel = request?.provider?.accessLevel ?? 0; // Default to 0 if accessLevel is undefined
         const currentUserRoles = request?.provider?.roles ?? []; // Default to empty array if roles are undefined
 
-        console.debug(`currentAccessLevel: |${currentAccessLevel}|, requiredAccessLevel: |${requiredAccessLevel}|`);
+        console.debug(`Target |${propertyKey.toString()}| with currentAccessLevel: |${currentAccessLevel}| & requiredAccessLevel: |${requiredAccessLevel}|`);
 
         if (requiredAccessLevel !== null) {
           if (requiredAccessLevel <= currentAccessLevel) {

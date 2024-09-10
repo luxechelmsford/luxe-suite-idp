@@ -69,6 +69,7 @@ export class ProviderDataStore {
       }
     }
 
+    console.debug(`Returing provideid |${providerId}| from findProviderIdBySubdomains`);
     return providerId;
   }
 }

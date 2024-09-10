@@ -62,8 +62,9 @@ export class ProviderController {
    * @param {Response} res - The HTTP response object to send the response.
    * @return {Promise<void>} - A promise that resolves when the function completes.
    */
-  @Auth.requiresRoleOrAccessLevel(1, [])
+  @Auth.requiresRoleOrAccessLevel(0, [])
   static async createProfile(req: Request, res: Response): Promise<void> {
+    console.debug("In createProfile");
     try {
       // Extract the decoded token from the request, which would have been appended by the middleware call to 'verifyIdToken'
       const uid = req.extendedDecodedIdToken?.uid; // Extract user ID from the authenticated user
