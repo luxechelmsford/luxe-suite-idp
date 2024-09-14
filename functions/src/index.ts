@@ -23,16 +23,18 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Apply CORS middleware
-const allowedOrigins: string[] = process.env.NODE_ENV === "production" ?
-  ["https://backoffice.theluxestudio.co.uk", "https://luxe-suite-backoffice.web.app"] :
-  ["https://backoffice.theluxestudio.co.uk", "https://luxe-suite-backoffice.web.app", "http://backoffice.localhost.com"];
+const allowedOriginPatterns = process.env.NODE_ENV === "production" ?
+  "^https://backoffice\\.theluxestudio\\.co\\.uk$|^https://luxe-suite-backoffice\\.web\\.app$" :
+  "^https://backoffice\\.theluxestudio\\.co\\.uk$|^https://luxe-suite-backoffice\\.web\\.app$|^https://backoffice\\.[a-zA-Z1-9]*\\.luxesuite\\.thetek\\.co\\.uk$";
 
-app.use(cors({
-  origin: function(origin, callback) {
-    if (allowedOrigins.indexOf(origin as string) !== -1 || !origin) {
-      callback(null, true);
+const corsMiddleware = cors({
+  origin: (origin, callback) => {
+    // Check if the origin is in the allowedOrigins array
+    if (!origin || new RegExp(allowedOriginPatterns).test(origin)) {
+      // Allow the origin
+      callback(null, origin);
     } else {
+      // Disallow the origin
       callback(new Error("Not allowed by CORS"));
     }
   },
@@ -42,7 +44,7 @@ app.use(cors({
   credentials: true, // Allow credentials
   exposedHeaders: ["Cache-Control", "Content-Language", "Content-Type", "Expires",
     "Last-Modified", "Pragma", /* "X-Content-Range",*/ "X-CSRF-Token"], // Expose these headers
-}));
+});
 
 // Middleware configuration
 app.use(express.json()); // For parsing application/json
@@ -51,36 +53,48 @@ app.use(cookieParser());
 // Handle preflight requests (OPTIONS) if needed
 app.options("*", cors({
   origin: function(origin, callback) {
-    if (allowedOrigins.indexOf(origin as string) !== -1 || !origin) {
-      callback(null, true);
+    // Check if the origin is in the allowedOrigins array
+    if (!origin || new RegExp(allowedOriginPatterns).test(origin)) {
+      // Allow the origin
+      callback(null, origin);
     } else {
+      // Disallow the origin
       callback(new Error("Not allowed by CORS"));
     }
   },
+
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   credentials: true,
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
-// Middleware to log requests
-app.use((req, _res, next) => {
-  console.debug(`Received |${req.method}| request for |${req.originalUrl}|`);
+// Middleware to log cookies
+app.use((req, res, next) => {
+  console.log("Received Cookies:", JSON.stringify(req.cookies), "|"); // Logs all cookies from the request
   next();
 });
 
+// Apply globals middleware routes
 app.use(Auth.verifyIdToken);
 // app.use(Auth.applyCsrfProtection);
 app.use(Auth.validateProviderId);
 
+// Middleware to log provider
+app.use((req, res, next) => {
+  console.log("Provider in the Request:", JSON.stringify(req.provider), "|");
+  next();
+});
+
+// Attach all applications to the middleware
 app.use("/api/v1/auth", authApp);
 app.use("/api/v1/provider", providerApp);
 
 // Export the Express app as a Firebase Cloud Function
 export const api = v2.https.onRequest({region: defaultRegion}, (req, res) => {
-  // corsMiddleware(req, res, async () => {
-  app(req, res);
-  console.debug(`++++++++++++++ Exiting |${req.method}| request for |${req.originalUrl}|`);
-  // )};
+  corsMiddleware(req, res, async () => {
+    app(req, res);
+    console.debug(`++++++++++++++ Exiting |${req.method}| request for |${req.originalUrl}|`);
+  });
 });
 
 // Export triggers
