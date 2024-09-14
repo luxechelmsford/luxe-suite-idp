@@ -25,6 +25,9 @@
       "enabled": true,
       "port": 4001
     },
+    "logging": {
+      "port": 4501
+    },
     "functions": {
       "port": 5001
     }
