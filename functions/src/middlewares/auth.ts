@@ -4,7 +4,7 @@ import {auth/* , csrfSecret*/} from "../configs/firebase";
 import {ErrorCodes, ErrorEx} from "../types/errorEx";
 import {FirebaseError} from "firebase-admin";
 import {SessionCookie} from "./sessionCookie";
-import {ProviderDataStore} from "../dataStore/collections/providers/models/providerDataStore";
+import {Provider} from "./provider";
 // import {Fqdn} from "../utils/fqdn";
 // import {doubleCsrf} from "csrf-csrf";
 
@@ -376,38 +376,12 @@ export class Auth {
   static async validateProviderId(req: Request, res: Response, next: NextFunction) {
     let provider;
     try {
-    // Get the host header and extract the subdomain as provider ID
-      const hostHeader = req.headers.host;
-      const subdomainFromHostHeader = hostHeader ? hostHeader.split(".")[0] : "";
-      const subdomainFromSubdomainHeaders = req.headers["X-Subdomain"] || req.headers["x-subdomain"] || "";
-      const subdomainFromSubdomainHeader = Array.isArray(subdomainFromSubdomainHeaders) ?
-        subdomainFromSubdomainHeaders[0]: subdomainFromSubdomainHeaders;
-
-      if ( !subdomainFromHostHeader && !subdomainFromSubdomainHeader ) {
-        res.status(400).json({
-          status: "failed",
-          message: "Provider ID is required to be passed in the host header as a subdomain part, or in the request as providerId",
-          code: ErrorCodes.PROVIDER_ID_FAILURE,
-        });
-        return;
-      }
-
-      console.debug(`Subdomian in Host header |${subdomainFromHostHeader}|`);
-      console.debug(`Subdomain in the X-Subdomain header |${subdomainFromSubdomainHeader}|`);
-
-      // lets build a subdomains array and serach for the provider id by subdomain
-      const subdomains = [];
-      if (subdomainFromSubdomainHeader) subdomains.push(subdomainFromSubdomainHeader);
-      if (subdomainFromHostHeader) subdomains.push(subdomainFromHostHeader);
-
-      const providerId = await ProviderDataStore.findProviderIdBySubdomains(subdomains, req) || "";
-
+      const providerId = await Provider.findBySubdomain(req) || "";
       if (!providerId) {
-        console.debug(`Subdomains |${JSON.stringify(subdomains)}| in the Host or X-Subdomain header cannnot be resolved to a provider id.`),
         res.status(400).json({
-          status: "failed",
+          status: "Failed",
           code: ErrorCodes.PROVIDER_ID_FAILURE,
-          message: `Subdomains |${JSON.stringify(subdomains)}| in the Host or X-Subdomain header cannnot be resolved to a provider id.`,
+          message: `The Host |${req.headers.host}| or X-Subdomain header |${req.headers["X-Subdomain"] || req.headers["x-subdomain"]}| cannnot be resolved to a provider id.`,
         });
         return;
       }
@@ -424,14 +398,13 @@ export class Auth {
         // lets give a default provcider profile with no role or accesslevel and let ot create the profile
         provider = {
           id: providerId,
-          admin: false,
           roles: [],
           accessLevel: 0,
         };
         /*
         console.debug(`User does not have access to resources of this provider |${providerId}|`),
         res.status(403).json({
-          status: "failed",
+          status: "Failed",
           code: ErrorCodes.PROVIDER_ID_FAILURE,
           message: `User does not have access to resources of this provider |${providerId}|`,
         });
@@ -441,7 +414,7 @@ export class Auth {
     } catch (error) {
       console.error(`Failed to validate provider id. Last Error: |${(error as Error).message}|`);
       res.status(400).json({
-        status: "failed",
+        status: "Failed",
         message: `Failed to validate provider id. Last Error: |${(error as Error).message}|`,
         code: ErrorCodes.PROVIDER_ID_FAILURE,
       });
@@ -458,16 +431,19 @@ export class Auth {
   /**
    * Decorator to enforce role-based or access level-based access control on a method.
    *
+   * @param {boolean | null} superAdmin
+   *   Id superAdmin privileges is required to access this funtion If null, access control will be based on acceslevl is required.
    * @param {number | null} requiredAccessLevel
    *   The access level required to access the method. If null, access control will be based on roles.
    * @param {string[]} requiredRoles
    *   The roles required to access the method, used only if requiredAccessLevel is null.
    * @return {MethodDecorator} A decorator function.
    */
-  static requiresRoleOrAccessLevel(requiredAccessLevel: number | null, requiredRoles: string[]): MethodDecorator {
+  static requiresRoleOrAccessLevel(superAdmin: boolean | null, requiredAccessLevel: number | null, requiredRoles: string[] | null): MethodDecorator {
     return function(target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor): PropertyDescriptor {
       console.debug(
-        `In requiresRoleOrAccessLevel for target |${propertyKey.toString()}| with requiredAccessLevel |${requiredAccessLevel}| & requiredRoles: |${JSON.stringify(requiredRoles)}|`
+        `In requiresRoleOrAccessLevel for target |${(target as object)?.constructor.name}:: ${propertyKey.toString()}| with ` +
+        `requiredAccessLevel |${requiredAccessLevel}| & requiredRoles: |${JSON.stringify(requiredRoles)}|`
       );
 
       const originalMethod = descriptor.value;
@@ -482,9 +458,19 @@ export class Auth {
         const currentAccessLevel = request?.provider?.accessLevel ?? 0; // Default to 0 if accessLevel is undefined
         const currentUserRoles = request?.provider?.roles ?? []; // Default to empty array if roles are undefined
 
-        console.debug(`Target |${propertyKey.toString()}| with currentAccessLevel: |${currentAccessLevel}| & requiredAccessLevel: |${requiredAccessLevel}|`);
+        console.debug(`Target |${(target as object)?.constructor.name}:: ${propertyKey.toString()}| ` +
+          `with currentAccessLevel: |${currentAccessLevel}| & requiredAccessLevel: |${requiredAccessLevel}|`);
 
-        if (requiredAccessLevel !== null) {
+        if (superAdmin !== null) {
+          if (!superAdmin || request?.extendedDecodedIdToken?.superAdmin) {
+            return originalMethod.apply(this, [request, ...args]);
+          } else {
+            throw new ErrorEx(
+              ErrorCodes.AUTH_FAILURE,
+              "Access denied: You do not have the required access level to access this function."
+            );
+          }
+        } else if (requiredAccessLevel !== null) {
           if (requiredAccessLevel <= currentAccessLevel) {
             return originalMethod.apply(this, [request, ...args]);
           } else {
@@ -494,7 +480,7 @@ export class Auth {
             );
           }
         } else {
-          if (requiredRoles.length > 0 && currentUserRoles.some((role) => requiredRoles.includes(role))) {
+          if ((!requiredRoles || requiredRoles.length === 0) || (requiredRoles.length > 0 && currentUserRoles.some((role) => requiredRoles.includes(role)))) {
             return originalMethod.apply(this, [request, ...args]);
           } else {
             throw new ErrorEx(

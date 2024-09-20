@@ -1,11 +1,11 @@
 import express from "express";
-import providerRouter from "../routers/providerRouter";
+import userRouter from "./userRouter";
 
 // Initialize express application
-const app = express();
+const userApp = express();
 
 // Define routes
-app.use("/", providerRouter);
+userApp.use("/", userRouter);
 
 // Export the app to be used in other modules
-export {app};
+export {userApp};

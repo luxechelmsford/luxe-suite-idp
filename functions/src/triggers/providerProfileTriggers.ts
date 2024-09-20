@@ -1,7 +1,9 @@
+/*
 import * as functions from "firebase-functions";
 import {auth, database, defaultRegion} from "../configs/firebase"; // Import auth from configs/firebase
 import {jsonString2Array} from "../utils/helper";
 import Lock from "../utils/lock";
+*/
 
 /**
  * Trigger function that fires when an provider's profile is updated in the Realtime Database.
@@ -11,6 +13,7 @@ import Lock from "../utils/lock";
  * @param {functions.context} context - Context object containing information about the trigger event.
  * @return {Promise<void>} - A promise that resolves when the function completes.
  */
+/*
 export const onProviderProfileUpdate = functions.region(defaultRegion).database
   .ref("/providers/{providerId}/users/{uid}")
   .onUpdate(async (change, context) => {
@@ -105,7 +108,7 @@ export const onProviderProfileUpdate = functions.region(defaultRegion).database
     } catch (error) {
       console.error(`Error updating user claims and logging event for UID: ${uid}`, error);
     }
-  });
+  });*/
 
 
 /**
@@ -116,6 +119,7 @@ export const onProviderProfileUpdate = functions.region(defaultRegion).database
    * @param {functions.context} context - Context object containing information about the trigger event.
    * @return {Promise<void>} - A promise that resolves when the function completes.
    */
+/*
 export const onUserProviderProfileDelete = functions.region(defaultRegion).database
   .ref("/providers/{providerId}/users/{uid}")
   .onDelete(async (snapshot, context) => {
@@ -182,4 +186,4 @@ export const onUserProviderProfileDelete = functions.region(defaultRegion).datab
     } catch (error) {
       console.error(`Error updating user claims and logging event for UID: ${uid}`, error);
     }
-  });
+  });*/

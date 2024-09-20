@@ -20,6 +20,7 @@ module.exports = {
   ignorePatterns: [
     "/lib/**/*", // Ignore built files.
     "/generated/**/*", // Ignore generated files.
+    "dist/", // Ignore the output directory
   ],
   plugins: [
     "@typescript-eslint",
@@ -30,6 +31,8 @@ module.exports = {
     "import/no-unresolved": 0,
     "indent": ["error", 2],
     "max-len": ["error", 180],
-    "no-unused-vars": ["error", {"argsIgnorePattern": "^_", "varsIgnorePattern": "^_"}],
+    "@typescript-eslint/no-unused-vars": [
+      "error", {"argsIgnorePattern": "^_", "varsIgnorePattern": "^_"},
+    ],
   },
 };

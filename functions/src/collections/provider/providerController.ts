@@ -1,11 +1,6 @@
-import {auth, database} from "../configs/firebase";
 import {Request, Response} from "express";
-import Lock from "../utils/lock";
-import {jsonString2Array} from "../utils/helper";
-import {FirebaseError} from "firebase-admin";
-import {ErrorCodes} from "../types/errorEx";
-import {Auth} from "../middlewares/auth";
-import {Fqdn} from "../utils/fqdn";
+import {ErrorCodes} from "../../types/errorEx";
+import {Auth} from "../../middlewares/auth";
 
 /**
  * @class ProviderController
@@ -19,17 +14,17 @@ export class ProviderController {
    * @param {Response} res - The Express response object.
    * @param {string} providerIdOrSubdomain - The provider ID or subdomain to search for.
    * @return {Promise<unknown>} - A promise that resolves to the provider data with the ID field added, or `null` if not found.
+   *
+   * Dropping the access level to 0 is required to allow newly registered users to get through this
    */
-  @Auth.requiresRoleOrAccessLevel(1, [])
-  static async getId(req: Request, res: Response): Promise<unknown> {
+  @Auth.requiresRoleOrAccessLevel(null, 0, [])
+  async getId(req: Request, res: Response): Promise<unknown> {
     console.debug("in getProviderId");
-
-    const fqdn = new Fqdn(req);
-    console.debug(`Fqdn: |${JSON.stringify(fqdn)}|`);
 
     // Extract the decoded token from the request, which would have been appended by the middleware call to 'verifyIdToken'
     const providerId = req?.provider?.id || ""; // Provider object would have been attached to the request at validateProviderId
     if (!providerId) {
+      console.debug(`No Provider Id found: |${JSON.stringify(req?.provider)}|`);
       res.status(403).json({
         status: "Failed",
         code: ErrorCodes.PROVIDER_ID_FAILURE,
@@ -37,6 +32,8 @@ export class ProviderController {
       });
       return;
     }
+
+    console.debug(`Provider Id found: |${providerId}|`);
 
     res.status(200).json({
       status: "Success",
@@ -46,6 +43,7 @@ export class ProviderController {
       code: "auth/success",
       message: "Provider found!",
     });
+    console.debug(`Rurturning Provider Id: |${providerId}|`);
     return;
   }
 
@@ -62,8 +60,9 @@ export class ProviderController {
    * @param {Response} res - The HTTP response object to send the response.
    * @return {Promise<void>} - A promise that resolves when the function completes.
    */
-  @Auth.requiresRoleOrAccessLevel(0, [])
-  static async createProfile(req: Request, res: Response): Promise<void> {
+  /*
+  @Auth.requiresRoleOrAccessLevel(null, 0, [])
+  async createProfile(req: Request, res: Response): Promise<void> {
     console.debug("In createProfile");
     try {
       // Extract the decoded token from the request, which would have been appended by the middleware call to 'verifyIdToken'
@@ -89,19 +88,19 @@ export class ProviderController {
         return;
       }
 
-      // Validate providerId against the Realtime Database
-      /*
-      const orgRef = database.ref(`/global/providers/${providerId}`);
-      const orgSnapshot = await orgRef.once("value");
+      // // Validate providerId against the Realtime Database
 
-      if (!orgSnapshot.exists()) {
-        res.status(400).json({
-          status: "Failed",
-          code: ErrorCodes.PROVIDER_ID_FAILURE,
-          message: "Invalid providerId.",
-        });
-        return;
-      }*/
+      // const orgRef = database.ref(`/global/providers/${providerId}`);
+      // const orgSnapshot = await orgRef.once("value");
+
+      // if (!orgSnapshot.exists()) {
+      //   res.status(400).json({
+      //     status: "Failed",
+      //     code: ErrorCodes.PROVIDER_ID_FAILURE,
+      //     message: "Invalid providerId.",
+      //   });
+      //   return;
+      // }
 
       // Create an instance of the Lock class
       const lock = new Lock(`users-${uid}`);
@@ -215,5 +214,5 @@ export class ProviderController {
       });
       return;
     }
-  }
+  }*/
 }

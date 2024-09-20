@@ -4,7 +4,6 @@ import {Request} from "express";
 // Define the structure of the provider claims
 export interface ProviderClaim {
   id: string; // providerId this cusotm claims belong to
-  admin: boolean;
   roles: string[];
   accessLevel: number;
 }

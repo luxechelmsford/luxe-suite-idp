@@ -6,12 +6,13 @@ import cookieParser from "cookie-parser";
 
 import {defaultRegion} from "./configs/firebase";
 import {Auth} from "./middlewares/auth";
-import {app as authApp} from "./apps/authApp";
-import {app as providerApp} from "./apps/providerApp";
+import {providerApp} from "./collections/provider/providerApp";
+import {userApp} from "./collections/user/userApp";
+import {userProfileApp} from "./collections/userProfile/userProfileApp";
 
 // Import triggers
 import {onGlobalUserCreate, onGlobalProfileUpdate} from "./triggers/globalProfileTriggers";
-import {onProviderProfileUpdate, onUserProviderProfileDelete} from "./triggers/providerProfileTriggers";
+// import {onProviderProfileUpdate, onUserProviderProfileDelete} from "./triggers/providerProfileTriggers";
 
 // Create the main Express application
 const app = express();
@@ -86,8 +87,9 @@ app.use((req, res, next) => {
 });
 
 // Attach all applications to the middleware
-app.use("/api/v1/auth", authApp);
 app.use("/api/v1/provider", providerApp);
+app.use("/api/v1/users", userApp);
+app.use("/api/v1/user-profiles", userProfileApp);
 
 // Export the Express app as a Firebase Cloud Function
 export const api = v2.https.onRequest({region: defaultRegion}, (req, res) => {
@@ -101,6 +103,6 @@ export const api = v2.https.onRequest({region: defaultRegion}, (req, res) => {
 export {
   onGlobalUserCreate,
   onGlobalProfileUpdate,
-  onProviderProfileUpdate,
-  onUserProviderProfileDelete,
+  // onProviderProfileUpdate,
+  // onUserProviderProfileDelete,
 };

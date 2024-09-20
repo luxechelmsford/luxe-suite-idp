@@ -4,7 +4,7 @@
     "module": "ESNext",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-  "moduleResolution": "Node",
+    "moduleResolution": "Node",
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
@@ -16,5 +16,5 @@
     "src/**/*.ts",
     "esbuild.config.js",
   ],
-  "exclude": ["node_modules", "lib"]
+  "exclude": ["node_modules"]
 }
