@@ -32,7 +32,7 @@ export const onProviderProfileUpdate = functions.region(defaultRegion).database
         const userRecord = await auth.getUser(uid);
 
         // Extract relevant fields
-        const email = userRecord.email || "N/A";
+        const emailId = userRecord.emailId || "N/A";
         const fullName = userRecord.displayName || "N/A";
 
         // find provider in the currentClaim with the same providerId
@@ -42,13 +42,13 @@ export const onProviderProfileUpdate = functions.region(defaultRegion).database
         const index = updatedClaims.providers.findIndex((org: {id: string;}) => org.id === providerId);
         if (index != -1) {
           updatedClaims.providers[index].admin = after.admin || updatedClaims.providers[index].admin || false; // Update admin role
-          updatedClaims.providers[index].roles = jsonString2Array(after.roles) || updatedClaims.providers[index].roles || [];// Update roles
+          updatedClaims.providers[index].roles = Helper.jsonString2Array(after.roles) || updatedClaims.providers[index].roles || [];// Update roles
           updatedClaims.providers[index].accessLevel = after.accessLevel || updatedClaims.providers[index].accessLevel || 0; // Update access level
         } else {
           updatedClaims.providers.push({
             id: providerId,
             admin: after.admin || false,
-            roles: jsonString2Array(after.roles) || [],
+            roles: Helper.jsonString2Array(after.roles) || [],
             accessLevel: after.accessLevel || 0,
           });
         }
@@ -60,8 +60,8 @@ export const onProviderProfileUpdate = functions.region(defaultRegion).database
             // Update the specific provider's claim
             return {
               ...org,
-              admin: (jsonString2Array(after.roles) || []).includes("admin") || false, // Update admin role
-              roles: jsonString2Array(after.roles) || org.roles, // Update roles
+              admin: (Helper.jsonString2Array(after.roles) || []).includes("admin") || false, // Update admin role
+              roles: Helper.jsonString2Array(after.roles) || org.roles, // Update roles
               accessLevel: after.accessLevel || org.accessLevel, // Update access level
             };
           }
@@ -75,7 +75,7 @@ export const onProviderProfileUpdate = functions.region(defaultRegion).database
           event: "providerProfileUpdatedAutomatically",
           providerIdUpdated: providerId,
           uid: uid,
-          emailId: email,
+          emailId: emailId,
           fullName: fullName,
           oldProfile: JSON.stringify(before || {}) || "",
           newProfile: JSON.stringify(after || {}) || "",
@@ -146,7 +146,7 @@ export const onUserProviderProfileDelete = functions.region(defaultRegion).datab
         await auth.setCustomUserClaims(uid, updatedClaims);
 
         // Extract relevant fields
-        const email = userRecord.email || "N/A";
+        const emailId = userRecord.emailId || "N/A";
         const fullName = userRecord.displayName || "N/A";
 
         // Log the event to /providers/${providerId}/logs/users/{timestamp}
@@ -154,7 +154,7 @@ export const onUserProviderProfileDelete = functions.region(defaultRegion).datab
           event: "providerProfileDeleted",
           providerId: providerId,
           uid: uid,
-          emailId: email,
+          emailId: emailId,
           fullName: fullName,
           deletedProvider: providerId,
           oldProfile: JSON.stringify(snapshot.val() || {}) || "",

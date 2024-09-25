@@ -11,7 +11,7 @@ import Lock from "../utils/lock";
  */
 export const onGlobalUserCreate = functions.region(defaultRegion).auth.user().onCreate(async (user) => {
   const uid = user.uid;
-  const email = user.email || "N/A"; // Handle cases where email might be null
+  const emailId = user.emailId || "N/A"; // Handle cases where emailId might be null
   const fullName = user.displayName || "N/A"; // Handle cases where displayName might be null
   const profileURL = user.photoURL || "N/A"; // Assuming `photoURL` can be used as `profileURL`
 
@@ -36,7 +36,7 @@ export const onGlobalUserCreate = functions.region(defaultRegion).auth.user().on
 
       // Create a global profile in Realtime Database
       await database.ref(`/global/users/${uid}/`).set({
-        email: email,
+        emailId: emailId,
         fullName: fullName,
         superAdmin: false, // Set default value for superAdmin
         profileURL: profileURL, // Use the profile URL from the user record
@@ -49,7 +49,7 @@ export const onGlobalUserCreate = functions.region(defaultRegion).auth.user().on
       await database.ref(`/global/logs/users/${timestamp}/`).set({
         event: "userRegistered",
         uid: uid,
-        emailId: email,
+        emailId: emailId,
         fullName: fullName,
         oldProfile: currentClaims.supperAdmin ? JSON.stringify({superAdmin: currentClaims.supperAdmin}) : "",
         newProfile: JSON.stringify({superAdmin: newSuperAdmin}) || "",
@@ -69,7 +69,7 @@ export const onGlobalUserCreate = functions.region(defaultRegion).auth.user().on
       await database.ref(`/global/logs/errors/${timestamp}/`).set({
         event: "userRegistrationFailed",
         uid: uid,
-        emailId: email,
+        emailId: emailId,
         fullName: fullName,
         error: (error as Error).message,
       });
@@ -106,7 +106,7 @@ export const onGlobalProfileUpdate = functions.region(defaultRegion).database
       const newSuperAdmin = after.superAdmin || false;
 
       // Extract relevant fields
-      const email = userRecord.email || "";
+      const emailId = userRecord.emailId || "";
       const fullName = userRecord.displayName || "";
 
       // Create an instance of the Lock class
@@ -127,7 +127,7 @@ export const onGlobalProfileUpdate = functions.region(defaultRegion).database
         await database.ref(`/global/logs/users/${timestamp}`).set({
           event: "globalProfileUpdated",
           uid: uid,
-          emailId: email,
+          emailId: emailId,
           fullName: fullName,
           oldProfile: JSON.stringify({superAdmin: oldSuperAdmin}) || "",
           newProfile: JSON.stringify({superAdmin: newSuperAdmin}) || "",
@@ -147,7 +147,7 @@ export const onGlobalProfileUpdate = functions.region(defaultRegion).database
         await database.ref(`/global/logs/errors/${timestamp}/`).set({
           event: "GlobalProfileUpdateFailed",
           uid: uid,
-          emailId: email,
+          emailId: emailId,
           fullName: fullName,
           error: (error as Error).message,
         });

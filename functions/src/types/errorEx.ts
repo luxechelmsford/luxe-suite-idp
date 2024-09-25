@@ -10,6 +10,7 @@ export const ErrorCodes = {
   SESSION_COOKIE_MISSING_CSRF_COOKIE: "luxe-suite/session-cookie-missing-csrf-cookie",
   SESSON_COOKIE_FAILED_VERIFY: "luxe-suite/session-cookie-failed-verify",
   AUTH_FAILURE: "luxe-suite/auth-failure",
+  AUTH_UID_EMAIL_MISMATCHED: "luxe-suite/auth-uid-emailId-mismatched",
   AUTH_MISSING_CREDENTIALS: "luxe-suite/auth-missing-credential",
   AUTH_REAUTHENTICATION_REQUIRED: "luxe-suite/auth-reauthentication-required",
   CSRF_TOKEN_FUNCTION_MISSING: "luxe-suite/csfr-token-function-missing",

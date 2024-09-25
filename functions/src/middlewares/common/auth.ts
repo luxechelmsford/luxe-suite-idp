@@ -1,12 +1,12 @@
 import {Request, Response, NextFunction} from "express";
-import {ExtendedDecodedIdToken} from "../types/extendedTypes";
-import {auth/* , csrfSecret*/} from "../configs/firebase";
-import {ErrorCodes, ErrorEx} from "../types/errorEx";
+import {IExtendedDecodedIdToken} from "../../types/extendedTypes";
+import {auth, csrfSecret, SessionCookieOnlyMode} from "../../configs/firebase";
+import {ErrorCodes, ErrorEx} from "../../types/errorEx";
 import {FirebaseError} from "firebase-admin";
 import {SessionCookie} from "./sessionCookie";
-import {Provider} from "./provider";
-// import {Fqdn} from "../utils/fqdn";
-// import {doubleCsrf} from "csrf-csrf";
+import {Fqdn} from "../../utils/fqdn";
+import {doubleCsrf} from "csrf-csrf";
+import {Provider} from "../provider";
 
 /**
  * @class Auth
@@ -22,7 +22,6 @@ export class Auth {
    * @return {string} The generated CSRF token.
    * @return {void}
    */
-  /*
   static async generateCsrfToken(req: Request, res: Response) {
     console.debug("generateCsrfToken");
     let csrfToken;
@@ -124,7 +123,7 @@ export class Auth {
       // only one cookie with the name "__session" is passed through cloud fucntions
       // so we store all the session related information in the session cookie as json object
       const fqdn = new Fqdn(req);
-      console.log(`__session: |${__session.toJSON()}, maxAge: |${__session.maxAge}|, root domian: |.${fqdn.root} & subdomain: |${fqdn.domain}|`);
+      console.log(`__session: |${__session.toJSON()}, maxAge: |${__session.maxAge}|, root domain: |.${fqdn.root} & subdomain: |${fqdn.domain}|`);
 
       // Create the session cookie
       res.cookie("__session", __session.toJSON(), __session.cookieOptions(`.${fqdn.root}`));
@@ -151,7 +150,7 @@ export class Auth {
       message: "CSRF generted successful!",
       data: {csrfToken},
     });
-  }*/
+  }
 
   /**
    * Verifies the ID token extracted from the `Authorization` header.
@@ -169,14 +168,13 @@ export class Auth {
    * @throws {Error} If an error occurs during token verification, sends a 401 or 500 response with the error message.
    */
   static async verifyIdToken(req: Request, res: Response, next: NextFunction) {
-    console.debug(`In verifyIdToken with headers |${JSON.stringify(req?.headers)}|`);
+    // console.debug(`In verifyIdToken with headers |${JSON.stringify(req?.headers)}|`);
 
-    const errorType = "ID token or Session Cookie";
-    let extendedDecodedIdToken: ExtendedDecodedIdToken | undefined = undefined;
-    console.debug("In verifyIdToken");
+    let extendedDecodedIdToken: IExtendedDecodedIdToken | undefined = undefined;
+    // console.debug("In verifyIdToken");
 
     // Check if Authorization header is present and properly formatted
-    if (req.headers.authorization && req.headers.authorization.startsWith("Bearer ")) {
+    if (!SessionCookieOnlyMode && req.headers.authorization && req.headers.authorization.startsWith("Bearer ")) {
       console.log("Found Authorization header");
 
       // Extract the ID Token from the Authorization header
@@ -193,7 +191,7 @@ export class Auth {
       try {
         // Verify the ID Token
         console.log("Decoding id token");
-        extendedDecodedIdToken = await auth.verifyIdToken(idToken) as ExtendedDecodedIdToken;
+        extendedDecodedIdToken = await auth.verifyIdToken(idToken) as IExtendedDecodedIdToken;
         console.log("ID Token correctly decoded", extendedDecodedIdToken);
       } catch (error) {
         console.error("Error while verifying Firebase ID token from Authorization header:", error);
@@ -209,7 +207,7 @@ export class Auth {
       const __sessionString = (req?.cookies && req?.cookies["__session"]) || "";
       const __session = new SessionCookie(SessionCookie.parse(__sessionString));
 
-      console.debug(`Session Cookie found: |${__sessionString}|`);
+      // console.debug(`Session Cookie found: |${__sessionString}|`);
 
       if (!__session?.currentUid) {
         // Handle missing UID in session cookie
@@ -234,13 +232,13 @@ export class Auth {
         return;
       }
 
-      console.log(`Found ID token cookie |${idTokenCookie}|`);
-      console.log(`Found CSRF cookie |${__session?.csrfCookie}|`);
+      // console.log(`Found ID token cookie |${idTokenCookie}|`);
+      // console.log(`Found CSRF cookie |${__session?.csrfCookie}|`);
 
       try {
         // Verify the session cookie
-        extendedDecodedIdToken = await auth.verifySessionCookie(idTokenCookie, true /** checkRevoked */) as ExtendedDecodedIdToken;
-        console.log("ID token correctly decoded", extendedDecodedIdToken);
+        extendedDecodedIdToken = await auth.verifySessionCookie(idTokenCookie, true /** checkRevoked */) as IExtendedDecodedIdToken;
+        // console.log("ID token correctly decoded", extendedDecodedIdToken);
       } catch (error) {
         console.error("Error while verifying Firebase session cookie:", error);
         res.status((error as FirebaseError).code === "auth/id-token-expired" ? 401 : 500).json({
@@ -252,7 +250,7 @@ export class Auth {
       }
     } else {
       // No valid token found
-      const errorString = `Credentials [${errorType}] missing`;
+      const errorString = `Credentials [${SessionCookieOnlyMode ? "Session Cookie": "ID token or Session Cookie"}] missing`;
       console.error(errorString);
       res.status(403).json({
         status: "Failed",
@@ -264,7 +262,7 @@ export class Auth {
 
     // Ensure that a valid ID token or session cookie was used
     if (!extendedDecodedIdToken) {
-      const errorString = `Failed to decode ${errorType}`;
+      const errorString = `Failed to decode ${SessionCookieOnlyMode ? "Session Cookie": "ID token or Session Cookie"}`;
       console.error(errorString);
       res.status(403).json({
         status: "Failed",
@@ -276,7 +274,7 @@ export class Auth {
 
     // Attach the decoded token to the request
     req.extendedDecodedIdToken = extendedDecodedIdToken;
-    console.debug(`Decoded ID Token |${JSON.stringify(req.extendedDecodedIdToken)}| attached to the request`);
+    // console.debug(`Decoded ID Token |${JSON.stringify(req.extendedDecodedIdToken)}| attached to the request`);
 
     // Proceed to the next middleware
     next();
@@ -303,7 +301,6 @@ export class Auth {
    *                  calls `next()` to proceed to the next middleware/handler or
    *                  sends a response with an appropriate HTTP status code and error message.
    */
-  /*
   static applyCsrfProtection(req: Request, res: Response, next: NextFunction) {
     // Retrieve CSRF token from request headers and cookies
     const csrfHeaderToken = req.headers["X-CSRF-Token"] || req.headers["x-csrf-token"];
@@ -312,9 +309,9 @@ export class Auth {
     const __sessionString = (req?.cookies && req?.cookies["__session"]) || "";
     const __session = new SessionCookie(SessionCookie.parse(__sessionString));
 
-    console.debug(`Session cookie |${__sessionString}|`);
-    console.debug(`CSFR cookie in session cookie |${__session.csrfCookie}|`);
-    console.debug(`CSFR Token in Header |${csrfHeaderToken}|`);
+    // console.debug(`Session cookie |${__sessionString}|`);
+    // console.debug(`CSFR cookie in session cookie |${__session.csrfCookie}|`);
+    // console.debug(`CSFR Token in Header |${csrfHeaderToken}|`);
 
     // Check if both csrf fields are present
     if (!csrfHeaderToken || !__session.csrfCookie) {
@@ -329,7 +326,7 @@ export class Auth {
 
     // a bit of a hack
     // the double csrf library reads the csrf from a cookie and the entire context is considered as csrf token and its hash
-    // doe to the cross su cookie limitation sof firebase funcctions (only one cooke with the name __session can be passed through)
+    // due to the cross domian cookie limitations of firebase funcctions (only one cooke with the name __session can be passed through)
     // we create a fake request object and set two properties cookeis and headers
     const dummyRequest: Partial<Request> = {
       headers: {"x-csrf-token": Array.isArray(csrfHeaderToken) ? csrfHeaderToken[0] : csrfHeaderToken},
@@ -363,7 +360,7 @@ export class Auth {
 
     console.debug(`CSRF protection |${csrfHeaderToken}| applied successfully`);
     next();
-  }*/
+  }
 
 
   /**
@@ -391,7 +388,7 @@ export class Auth {
         (item: {id: string}) => item.id === providerId
       );
 
-      console.debug(`searched for provider: !${JSON.stringify(req.extendedDecodedIdToken)})`);
+      // console.debug(`searched for provider: !${JSON.stringify(req.extendedDecodedIdToken)})`);
 
       if (!provider) {
         // it could be thatb we are trying to create the provider profile,
@@ -441,10 +438,10 @@ export class Auth {
    */
   static requiresRoleOrAccessLevel(superAdmin: boolean | null, requiredAccessLevel: number | null, requiredRoles: string[] | null): MethodDecorator {
     return function(target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor): PropertyDescriptor {
-      console.debug(
-        `In requiresRoleOrAccessLevel for target |${(target as object)?.constructor.name}:: ${propertyKey.toString()}| with ` +
-        `requiredAccessLevel |${requiredAccessLevel}| & requiredRoles: |${JSON.stringify(requiredRoles)}|`
-      );
+      // console.debug(
+      //   `In requiresRoleOrAccessLevel for target |${(target as object)?.constructor.name}:: ${propertyKey.toString()}| with ` +
+      //   `requiredAccessLevel |${requiredAccessLevel}| & requiredRoles: |${JSON.stringify(requiredRoles)}|`
+      // );
 
       const originalMethod = descriptor.value;
 

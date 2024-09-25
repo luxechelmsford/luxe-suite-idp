@@ -2,7 +2,8 @@ import {Request, Response} from "express";
 import {User} from "../user/user";
 import {UserDataStore} from "../../dataStores/collections/userDataStore";
 import {ErrorCodes, ErrorEx} from "../../types/errorEx";
-import {Auth} from "../../middlewares/auth";
+import {Auth} from "../../middlewares/common/auth";
+import {FirebaseUserController} from "../user/firebaseUser/firebaseUserController";
 
 /**
  * Handles user profile related operations.
@@ -28,7 +29,7 @@ export class UserProfileController {
   /*
   @Auth.requiresRoleOrAccessLevel(null, 2, [])
   public async create(req: Request, res: Response): Promise<void> {
-    let userProfileJson: Record<string, unknown> = {};
+    let userProfileJson: {[key: string]: unknown} = {};
 
     const {forced, data} = req.body;
 
@@ -75,7 +76,7 @@ export class UserProfileController {
       console.debug(`User profile created ***** |${JSON.stringify(result)}|`);
 
       // Create a new instance of User with the returned data
-      const after = new User(result as Record<string, unknown>);
+      const after = new User(result as {[key: string]: unknown});
 
       console.debug(`After created ***** |${JSON.stringify(after)}|`);
 
@@ -109,7 +110,7 @@ export class UserProfileController {
    */
   @Auth.requiresRoleOrAccessLevel(null, 0, [])
   public async update(req: Request, res: Response): Promise<void> {
-    let userProfileJson: Record<string, unknown> = {};
+    let userProfileJson: {[key: string]: unknown} = {};
 
     try {
       const userId = req.params.id;
@@ -142,13 +143,30 @@ export class UserProfileController {
         return;
       }
 
-      if ((data as {email: string}).email != req.extendedDecodedIdToken?.email) {
+      if ((data as {emailId: string}).emailId != req.extendedDecodedIdToken?.emailId) {
         res.status(401).json({
           status: "Failed",
-          message: `Email is readonly and the new value |${data.email}| must match the current value |${req.extendedDecodedIdToken?.email}|`,
+          message: `Email is readonly and the new value |${data.emailId}| must match the current value |${req.extendedDecodedIdToken?.emailId}|`,
           code: ErrorCodes.INVALID_DATA,
         });
         return;
+      }
+
+      const firebaseUserControlller = new FirebaseUserController();
+      const firebaseUser = await firebaseUserControlller.read(userId);
+
+      if ((data as {id: string}).id !== (firebaseUser as {id: string}).id) {
+        throw new ErrorEx(
+          ErrorCodes.INVALID_DATA,
+          `Id |${firebaseUser.id}| is a readonly property and cannot be changed to |${data.id}|`
+        );
+      }
+
+      if ((data as {emailId: string}).emailId !== (firebaseUser as {emailId: string}).emailId) {
+        throw new ErrorEx(
+          ErrorCodes.INVALID_DATA,
+          `Email |${firebaseUser.emailId}| is a readonly property and cannot be changed to |${data.emailId}|`
+        );
       }
 
       const after = new User(data);
@@ -164,7 +182,7 @@ export class UserProfileController {
       }
 
       console.debug(`Creating user profile history record for |${JSON.stringify(result)}|`);
-      const before = new User(result as Record<string, unknown>);
+      const before = new User(result as {[key: string]: unknown});
 
       console.debug(`User profile updated from |${JSON.stringify(before)}| to |${JSON.stringify(after)}|`);
 
@@ -239,7 +257,7 @@ export class UserProfileController {
       const dataStore = new UserDataStore(req.provider?.id as string);
       const result = await dataStore.read(userId);
 
-      const after = new User(result as Record<string, unknown>);
+      const after = new User(result as {[key: string]: unknown});
       userProfileJson = after.toJson() || {};
     } catch (error) {
       console.error(error);
@@ -265,7 +283,7 @@ export class UserProfileController {
   /*
   @Auth.requiresRoleOrAccessLevel(null, 0, [])
   public async query(req: Request, res: Response): Promise<void> {
-    let userProfileJsons: Record<string, unknown>[] = [];
+    let userProfileJsons: {[key: string]: unknown}[] = [];
     try {
       const {filter, sort, range, pageInfo} = req.query;
 
@@ -282,7 +300,7 @@ export class UserProfileController {
       }
 
       userProfileJsons = (result.data || []).map((item) => {
-        const after = new User(item as Record<string, unknown>);
+        const after = new User(item as {[key: string]: unknown});
         return after.toJson();
       }) || [];
 
@@ -314,7 +332,7 @@ export class UserProfileController {
   /*
   @Auth.requiresRoleOrAccessLevel(null, 1, [])
   public async delete(req: Request, res: Response): Promise<void> {
-    let userProfileJson: Record<string, unknown> = {};
+    let userProfileJson: {[key: string]: unknown} = {};
     try {
       const userId = req.params.id;
 
@@ -332,7 +350,7 @@ export class UserProfileController {
 
       // Delete the record
       const result = await dataStore.delete(userId);
-      const before = new User(result as Record<string, unknown>);
+      const before = new User(result as {[key: string]: unknown});
       userProfileJson = before.toJson();
 
       console.debug(`User profile History for user profile with ID |${before.id}| deleted successfully`);

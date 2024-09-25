@@ -3,7 +3,7 @@ import {Query} from "firebase-admin/database";
 import {database} from "../../configs/firebase";
 import {ErrorCodes, ErrorEx} from "../../types/errorEx";
 import {IDataStore} from "../interfaces/dataStore";
-import {RealtimeDbDataStoreOptions} from "../utils/realtimeDbDataStoreOptions";
+import {RealtimeDbDataStoreOptions} from "./realtimeDbDataStoreOptions";
 import {RealtimeDbValueFieldType} from "../types/realtimeDbValeFieldType";
 import {CreateIdOption} from "../types/createIdOption";
 import {OrderByDirection} from "firebase-admin/firestore";
@@ -674,7 +674,7 @@ export abstract class RealtimeDbDataStore implements IDataStore {
 
     // let finalStoreFieldValue;
     let totalCount = 0;
-    let applicationDataArray: Record<string, unknown>[] = [];
+    let applicationDataArray: {[key: string]: unknown}[] = [];
     try {
       // Step 1: Apply filter
       if (filter) {
@@ -892,7 +892,7 @@ export abstract class RealtimeDbDataStore implements IDataStore {
         //   const id = keys[i]; // Get ID (key)
         //   const valueField = finalData[id]; // Retrieve value field
         //   console.debug(`Id |${id}|, value: |${valueField}|`);
-        //  applicationDataArray.push(this.fromStoreValueField(id, valueField) as Record<string, unknown>);
+        //  applicationDataArray.push(this.fromStoreValueField(id, valueField) as {[key: string]: unknown});
         // }
         applicationDataArray = finalData;
       }

@@ -1,6 +1,6 @@
 import {Request, Response} from "express";
 import {ErrorCodes} from "../../types/errorEx";
-import {Auth} from "../../middlewares/auth";
+import {Auth} from "../../middlewares/common/auth";
 
 /**
  * @class ProviderController
@@ -118,7 +118,7 @@ export class ProviderController {
           // Check if attributes exist and update them if not
           const updatedData = {
             fullName: currentData.fullName || req.extendedDecodedIdToken?.name || "", // preserve full name or propogate from token
-            emailId: currentData.emailId || req.extendedDecodedIdToken?.email || "", // preserve email or propogate from token
+            emailId: currentData.emailId || req.extendedDecodedIdToken?.emailId || "", // preserve emailId or propogate from token
             roles: currentData.roles || "[]", // preserve roles
             accessLevel: currentData.accessLevel || 0, // preserve access level
             profileURL: req.extendedDecodedIdToken?.picture || currentData.profileURL || "", // refresh profile URL
@@ -141,16 +141,16 @@ export class ProviderController {
           const index = updatedClaims.providers.findIndex((org: {id: string;}) => org.id === providerId);
           if (index != -1) {
             updatedClaims.providers[index].admin =
-              (jsonString2Array(updatedData.roles) || []).includes("admin") || updatedClaims.providers[index].admin || false; // Update admin role
+              (Helper.jsonString2Array(updatedData.roles) || []).includes("admin") || updatedClaims.providers[index].admin || false; // Update admin role
             updatedClaims.providers[index].roles =
-              jsonString2Array(updatedData.roles) || updatedClaims.providers[index].roles || [];// Update roles
+              Helper.jsonString2Array(updatedData.roles) || updatedClaims.providers[index].roles || [];// Update roles
             updatedClaims.providers[index].accessLevel =
               updatedData.accessLevel || updatedClaims.providers[index].accessLevel || 0; // Update access level
           } else {
             updatedClaims.providers.push({
               id: providerId,
-              admin: (jsonString2Array(updatedData.roles) || []).includes("admin") || false, // Use default values if not provided
-              roles: jsonString2Array(updatedData.roles || "[]"),
+              admin: (Helper.jsonString2Array(updatedData.roles) || []).includes("admin") || false, // Use default values if not provided
+              roles: Helper.jsonString2Array(updatedData.roles || "[]"),
               accessLevel: updatedData.accessLevel || 0,
             });
           }

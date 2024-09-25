@@ -1,6 +1,6 @@
-import {auth} from "../configs/firebase";
+import {auth} from "../../configs/firebase";
 import {CookieOptions} from "express";
-import {ErrorCodes, ErrorEx} from "../types/errorEx";
+import {ErrorCodes, ErrorEx} from "../../types/errorEx";
 
 
 /**

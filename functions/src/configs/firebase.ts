@@ -6,10 +6,13 @@ import * as admin from "firebase-admin";
 import {ServiceAccount} from "firebase-admin";
 import idpServiceAccount from "./idpServiceAccountKey.json";
 const localServiceAccount = {};
+import gmailServiceAccount from "../configs/gmailServiceAccountKey.json";
+import {google} from "googleapis";
 
 const appName = "";
 const idpAppName = "idpApp";
 const idpDatabaseUrl = "https://luxe-suite-idp-default-rtdb.europe-west1.firebasedatabase.app/";
+const skipIdTokenCheck = false;
 /*
  * do not copy thos accross the various projects - end
  *
@@ -18,6 +21,9 @@ const idpDatabaseUrl = "https://luxe-suite-idp-default-rtdb.europe-west1.firebas
 export const defaultRegion = "europe-west2";
 export const defaultOrganisationId = "luxe-studio";
 export const csrfSecret = idpServiceAccount.private_key_id;
+export const SessionCookieOnlyMode = skipIdTokenCheck;
+export const defaultOriginUrl = process.env.NODE_ENV === "production" ?
+  "https://backoffice.theluxestudio.co.uk" : "https://dev.luxesuite.thetek.co.uk";
 
 // Assuming `App` type has a `name` property
 interface App {
@@ -66,6 +72,17 @@ if (idpAppName) {
 // Initialize auth realtime db aad firestre instances with smilar JSON naming conventions
 export const auth = admin.auth(idpApp);
 export const database = admin.database(idpApp);
+
+// Initialize OAuth2 client
+export const oAuth2Client = new google.auth.OAuth2(
+  gmailServiceAccount.web.client_id,
+  gmailServiceAccount.web.client_secret,
+  "https://core.theluxestudio.co.uk" // Redirect URI
+);
+// Set refresh token
+oAuth2Client.setCredentials({
+  refresh_token: gmailServiceAccount.web.refresh_token,
+});
 /*
  * do not copy thos accross the various projects - end
  *

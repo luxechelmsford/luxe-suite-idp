@@ -1,7 +1,7 @@
 // Import necessary types and data store implementations
 import {RealtimeDbDataStore} from "../models/realtimeDbDataStore";
 import {CreateIdOption} from "../types/createIdOption";
-import {FirebaseDataStoreOptions} from "../utils/firebaseDataStoreOptions";
+import {FirebaseDataStoreOptions} from "../../dataStores/models/firebaseDataStoreOptions";
 import {RealtimeDbProviderDataStore} from "./realtimeDb/realtimeDbProviderDataStore";
 
 /**

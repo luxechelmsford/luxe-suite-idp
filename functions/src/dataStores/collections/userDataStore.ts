@@ -1,7 +1,7 @@
 // Import necessary types and data store implementations
 import {RealtimeDbDataStore} from "../models/realtimeDbDataStore";
 import {CreateIdOption} from "../types/createIdOption";
-import {FirebaseDataStoreOptions} from "../utils/firebaseDataStoreOptions";
+import {FirebaseDataStoreOptions} from "../models/firebaseDataStoreOptions";
 import {RealtimeDbUserDataStore} from "./realtimeDb/realtimeDbUserDataStore";
 
 /**
@@ -29,7 +29,7 @@ export class UserDataStore {
       new FirebaseDataStoreOptions({
         createIdOption: CreateIdOption.ManualRejectIdConflicts,
         requireTransaction: true,
-        readOnlyFields: ["email"],
+        readOnlyFields: ["emailId"],
       }),
     );
   }

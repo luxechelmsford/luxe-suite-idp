@@ -2,7 +2,11 @@ import {Request, Response} from "express";
 import {User} from "./user";
 import {UserDataStore} from "../../dataStores/collections/userDataStore";
 import {ErrorCodes, ErrorEx} from "../../types/errorEx";
-import {Auth} from "../../middlewares/auth";
+import {Auth} from "../../middlewares/common/auth";
+import {FirebaseUserController} from "./firebaseUser/firebaseUserController";
+import {FirebaseError} from "firebase-admin";
+import {defaultOriginUrl} from "../../configs/firebase";
+import {UserPin} from "./userPin";
 
 /**
  * Handles user related operations.
@@ -27,7 +31,7 @@ export class UserController {
    */
   @Auth.requiresRoleOrAccessLevel(true, 2, [])
   public async create(req: Request, res: Response): Promise<void> {
-    let userJson: Record<string, unknown> = {};
+    let userJson: {[key: string]: unknown} = {};
 
     const {forced, data} = req.body;
 
@@ -44,35 +48,65 @@ export class UserController {
       return;
     }
 
-    // todo, check that email is not changing
+    if (!(data as {id: string}).id && !(data as {emailId: string}).emailId) {
+      throw new ErrorEx(ErrorCodes.INVALID_PARAMETERS, `Id |${data.id}| or Email |${data.emailId}| is required.`);
+    }
 
     try {
-      // Create an instance of user to handle validation and unique ID
-      const before = new User(data);
+      // Create the provider user object and let the constructor validates the data
+      const newUser = new User(data);
 
-      // Create an instance of UserDataStore to handle the create operation
+      // create the firebase user first
+      let firebaseUser;
+      const firebaseUserControlller = new FirebaseUserController();
+      try {
+        firebaseUser = await firebaseUserControlller.create(data, req.headers?.origin || req.headers?.referer || defaultOriginUrl);
+      } catch (error) {
+        if ((error as FirebaseError).code !== "auth/uid-already-exists") {
+          console.error(`Error while retrieving user |${data.emailId}|. Last error:`, error);
+          throw error;
+        }
+        firebaseUser = await firebaseUserControlller.read(data.id || data.emailId);
+      }
+
+      if ((data as {id: string}).id && (data as {id: string}).id !== (firebaseUser as {id: string}).id) {
+        throw new ErrorEx(
+          ErrorCodes.INVALID_DATA,
+          `Id |${firebaseUser.id}| is a readonly property and cannot be changed to |${data.id}|`
+        );
+      }
+
+      if ((data as {emailId: string}).emailId !== (firebaseUser as {emailId: string}).emailId) {
+        throw new ErrorEx(
+          ErrorCodes.INVALID_DATA,
+          `Email |${firebaseUser.emailId}| is a readonly property and cannot be changed to |${data.emailId}|`
+        );
+      }
+
+      // Create an instance of ProviderUserDataStore to handle the create operation
+      // And perform the create operation with the provided ID and data
       const dataStore = new UserDataStore(req.provider?.id as string);
-
-      // Perform the create operation with the provided ID and data
-      const result = await dataStore.createWithId(before.id, before.dbJson());
+      const result = await dataStore.createWithId(firebaseUser.id as string,
+        {...newUser.dbJson(), hashedPin: new UserPin(data).hashedPin}
+      );
 
       if (!result) {
         throw new ErrorEx(
           ErrorCodes.RECORD_CREATE_FAILED,
-          `Failed to create user |${before.id}|`
+          `Failed to create user |${firebaseUser.id}|`
         );
       }
 
       console.debug(`User created ***** |${JSON.stringify(result)}|`);
 
       // Create a new instance of user with the returned data
-      const after = new User(result as Record<string, unknown>);
+      const createdUser = new User(result as {[key: string]: unknown});
 
-      console.debug(`After created ***** |${JSON.stringify(after)}|`);
+      console.debug(`After created ***** |${JSON.stringify(createdUser)}|`);
 
       // Convert the final user data to JSON format for the response
-      userJson = after.toJson() || {};
-      console.log(`User created with data |${JSON.stringify(after)}|`);
+      userJson = createdUser.toJson() || {};
+      console.log(`User created with data |${JSON.stringify(createdUser)}|`);
     } catch (error) {
       console.error(error);
       res.status(400).json({
@@ -100,7 +134,7 @@ export class UserController {
    */
   @Auth.requiresRoleOrAccessLevel(true, 2, [])
   public async update(req: Request, res: Response): Promise<void> {
-    let userJson: Record<string, unknown> = {};
+    let userJson: {[key: string]: unknown} = {};
 
     try {
       const userId = req.params.id;
@@ -124,25 +158,55 @@ export class UserController {
         return;
       }
 
-      const after = new User(data);
+      // Create the provider user object and let the constructor validates the data
+      const newUser = new User(data);
 
+      let firebaseUser;
+      const firebaseUserControlller = new FirebaseUserController();
+      try {
+        firebaseUser = await firebaseUserControlller.read(userId);
+      } catch (error) {
+        if ((error as FirebaseError).code !== "auth/user-not-found") {
+          console.error(error);
+          throw error;
+        }
+        firebaseUser = await firebaseUserControlller.create(data, req.headers?.origin || req.headers?.referer || defaultOriginUrl);
+      }
+
+      if ((data as {id: string}).id !== (firebaseUser as {id: string}).id) {
+        throw new ErrorEx(
+          ErrorCodes.INVALID_DATA,
+          `Id |${firebaseUser.id}| is a readonly property and cannot be changed to |${data.id}|`
+        );
+      }
+
+      if ((data as {emailId: string}).emailId !== (firebaseUser as {emailId: string}).emailId) {
+        throw new ErrorEx(
+          ErrorCodes.INVALID_DATA,
+          `Email |${firebaseUser.emailId}| is a readonly property and cannot be changed to |${data.emailId}|`
+        );
+      }
+
+      // Create an instance of ProviderUserDataStore to handle the update operation
+      // And perform the update operation with the provided ID and data
       const dataStore = new UserDataStore(req.provider?.id as string);
-      const result = await dataStore.transactionalUpdate(after.id, after.dbJson());
+      const result = await dataStore.transactionalUpdate(userId,
+        {...newUser.dbJson(), hashedPin: new UserPin(data).hashedPin}
+      );
 
       if (!result) {
         throw new ErrorEx(
           ErrorCodes.RECORD_UPDATE_FAILED,
-          `Failed to update user |${after.id}|`
+          `Failed to update user |${userId}|`
         );
       }
 
-      console.debug(`Creating user history record for |${JSON.stringify(result)}|`);
-      const before = new User(result as Record<string, unknown>);
-
-      console.debug(`User updated from |${JSON.stringify(before)}| to |${JSON.stringify(after)}|`);
+      const before = new User(result as {[key: string]: unknown});
+      console.debug(`User updated from |${JSON.stringify(before)}| to |${JSON.stringify(newUser)}|`);
 
       /*
-      if (before.historyRequired(after.toJson())) {
+      console.debug(`Creating user history record for |${JSON.stringify(result)}|`);
+      if (before.historyRequired(newUser.toJson())) {
         console.debug("About to create an instance of the user history record");
         const history = new HistoryImpl(
           "",
@@ -157,10 +221,10 @@ export class UserController {
 
         console.debug("About to add a user history record to firestore");
         const resultHistory = await dataStoreHistory.create(history.dbJson());
-        console.debug(`User History |${resultHistory}| for user |${after.id}| created successfully after user updates`);
+        console.debug(`User History |${resultHistory}| for user |${userId}| created successfully after user updates`);
       }*/
 
-      userJson = after.toJson() || {};
+      userJson = newUser.toJson() || {};
     } catch (error) {
       console.error(error);
       res.status(400).json({
@@ -202,7 +266,7 @@ export class UserController {
       const dataStore = new UserDataStore(req.provider?.id as string);
       const result = await dataStore.read(userId);
 
-      const after = new User(result as Record<string, unknown>);
+      const after = new User(result as {[key: string]: unknown});
       userJson = after.toJson() || {};
     } catch (error) {
       console.error(error);
@@ -227,7 +291,7 @@ export class UserController {
    */
   @Auth.requiresRoleOrAccessLevel(true, 1, [])
   public async query(req: Request, res: Response): Promise<void> {
-    let userJsons: Record<string, unknown>[] = [];
+    let userJsons: {[key: string]: unknown}[] = [];
     try {
       const {filter, sort, range, pageInfo} = req.query;
 
@@ -244,7 +308,7 @@ export class UserController {
       }
 
       userJsons = (result.data || []).map((item) => {
-        const after = new User(item as Record<string, unknown>);
+        const after = new User(item as {[key: string]: unknown});
         return after.toJson();
       }) || [];
 
@@ -275,7 +339,7 @@ export class UserController {
    */
   @Auth.requiresRoleOrAccessLevel(true, 3, [])
   public async delete(req: Request, res: Response): Promise<void> {
-    let userJson: Record<string, unknown> = {};
+    let userJson: {[key: string]: unknown} = {};
     try {
       const userId = req.params.id;
 
@@ -288,12 +352,20 @@ export class UserController {
         return;
       }
 
+      const firebaseUserControlller = new FirebaseUserController();
+      try {
+        await firebaseUserControlller.delete(userId, {});
+        console.debug(`Firebase User with UID |${userId}| deleted successfully`);
+      } catch (error) {
+        console.error(`Failed to delete Firebase User with UID |${userId}|. last error`, error);
+      }
+
       // Create an instance of user data store
       const dataStore = new UserDataStore(req.provider?.id as string);
 
       // Delete the record
       const result = await dataStore.delete(userId);
-      const before = new User(result as Record<string, unknown>);
+      const before = new User(result as {[key: string]: unknown});
       userJson = before.toJson();
 
       console.debug(`User History for user with ID |${before.id}| deleted successfully`);

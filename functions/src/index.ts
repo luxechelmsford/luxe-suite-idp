@@ -5,7 +5,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 
 import {defaultRegion} from "./configs/firebase";
-import {Auth} from "./middlewares/auth";
+import {Auth} from "./middlewares/common/auth";
 import {providerApp} from "./collections/provider/providerApp";
 import {userApp} from "./collections/user/userApp";
 import {userProfileApp} from "./collections/userProfile/userProfileApp";

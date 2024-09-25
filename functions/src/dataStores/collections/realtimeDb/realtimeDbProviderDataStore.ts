@@ -1,8 +1,8 @@
-import {RealtimeDbPathBuilder} from "../../utils/realtimeDbPathBuilder";
+import {RealtimeDbPathBuilder} from "../../models/realtimeDbPathBuilder";
 import {RealtimeDbDataStore} from "../../models/realtimeDbDataStore";
-import {RealtimeDbDataStoreOptions} from "../../utils/realtimeDbDataStoreOptions";
+import {RealtimeDbDataStoreOptions} from "../../models/realtimeDbDataStoreOptions";
 import {RealtimeDbValueFieldType} from "../../types/realtimeDbValeFieldType";
-import {FirebaseDataStoreOptions} from "../../utils/firebaseDataStoreOptions";
+import {FirebaseDataStoreOptions} from "../../models/firebaseDataStoreOptions";
 
 /**
  * Class representing a data store for managing provider in the Realtime Database.

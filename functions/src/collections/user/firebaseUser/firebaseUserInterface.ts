@@ -1,12 +1,20 @@
 // import {RelatedEntities} from "./relatedEntities";
 
 
+export type MultiFactor = {
+  enrollmentFactors: [{
+    phoneNumber: string, //  E.164 standard compliant identifier string.
+    displayName: string,
+    factorId: string, // defaults to phone
+  }],
+};
+
 /**
  * Represents a user with personal and consent information.
  */
-export interface IUser {
+export interface IFirebaseUser {
   /**
-   * The user's id, which is the UID assigned by Firebase Authentication service.
+   * The user's Uid, which is the UID assigned by Firebase Authentication service.
    *
    * @type {string}
    */
@@ -34,11 +42,18 @@ export interface IUser {
   lastName: string;
 
   /**
-   * determine if the user has supper admin privileges
+   * The user's phone number.
    *
-   * @type {boolean}
+   * @type {string}
    */
-  superAdmin: boolean;
+  phoneNumber: string;
+
+  /**
+   * The user's phone number iused for multi factor authntication, if not defined user';s phone number is used
+   *
+   * @type {string}
+   */
+  multiFactorPhoneNumber: string;
 
   /**
    * The profile photo of the user, typically caoptuerd through social login
@@ -49,62 +64,6 @@ export interface IUser {
     url: string | null,
     displayName: string | null
   };
-
-  /**
-   * The color used for the skin and other user interface
-   *
-   * @type {string | null}
-   */
-  profileColour: string | null;
-
-  /**
-   * The user's phone number, if available. This field is optional and can be null.
-   *
-   * @type {string | null}
-   */
-  phoneNumber: string | null;
-
-  /**
-   * The user's address, represented by a reference ID.
-   *
-   * @type {string}
-   */
-  addressId: string | null;
-
-  /**
-   * The user's date of birth, if available. This field is optional and can be null.
-   *
-   * @type {Date | null}
-   */
-  dob: Date | null;
-
-  /**
-   * The date and time when the user was createdAt.
-   *
-   * @type {Date}
-   */
-  createdAt: Date;
-
-  /**
-   * The identifier of the user or system that createdAt the user record.
-   *
-   * @type {string}
-   */
-  createdBy: string;
-
-  /**
-   * The date and time when the user record was last updated.
-   *
-   * @type {Date}
-   */
-  lastUpdatedAt: Date;
-
-  /**
-   * The identifier of the user or system that last updated the user record.
-   *
-   * @type {string}
-   */
-  lastUpdatedBy: string;
 
   /**
    * Gets the JSON representation of the object with all properties.

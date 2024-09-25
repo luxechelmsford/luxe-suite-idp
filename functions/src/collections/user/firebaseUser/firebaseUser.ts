@@ -1,84 +1,95 @@
-import {ErrorCodes, ErrorEx} from "../../types/errorEx";
-import {IUser} from "./userInterface";
-import {Helper} from "../../utils/helper";
+import {ErrorCodes, ErrorEx} from "../../../types/errorEx";
+import {MultiFactor, IFirebaseUser} from "./firebaseUserInterface";
+import {Helper} from "../../../utils/helper";
+// import {PhoneMultiFactorGenerator} from "firebase/auth";
 
 
 /**
  * Implementation of the IUser interface.
  */
-export class User implements IUser {
+export class FirebaseUser implements IFirebaseUser {
   #id: string;
   #emailId: string;
-  #superAdmin: boolean;
-
   #firstName: string;
   #lastName: string;
+  #phoneNumber: string;
+
+  #multiFactorPhoneNumber: string;
 
   #profilePhoto: {
     url: string | null;
     displayName: string | null;
   };
 
-  #profileColour: string | null;
-  #phoneNumber: string | null;
-  #addressId: string | null;
-  #dob: Date | null;
-
-  #createdAt: Date;
-  #createdBy: string;
-  #lastUpdatedAt: Date;
-  #lastUpdatedBy: string;
-
   /**
    * Creates an instance of the user class.
    * @param {Object} data {{[key: string]: unknown}} - The user data.
    */
   constructor(data: {[key: string]: unknown}) {
+    const isValidE164 = (phoneNumber: string): boolean => {
+      const e164Regex = /^\+?[1-9]\d{1,14}$/;
+      return e164Regex.test(phoneNumber);
+    };
+
     if (data == null) {
       throw new ErrorEx(ErrorCodes.INVALID_PARAMETERS, `Invalid data |${data}|. Null or undefined data found`);
     }
 
     // Validate email
-    if (!(data as { emailId: string }).emailId?.trim()) {
+    if ((!(data as { emailId: string }).emailId?.trim()) && (!(data as { email: string }).email?.trim())) {
       throw new ErrorEx(
         ErrorCodes.INVALID_PARAMETERS,
-        `Email |${data.emailId}| is required.`,
+        `Email |${data.email}| or EmailId |${data.emailId}| is required in data |${JSON.stringify(data)}|.`,
       );
     }
 
     // Validate firstName and lastName
-    if ((!(data as { firstName: string }).firstName?.trim() || !(data as { lastName: string }).lastName?.trim()) && !((data as { fullName: string }).fullName?.trim())) {
+    if ((!(data as { firstName: string }).firstName?.trim() || !(data as { lastName: string }).lastName?.trim()) && !((data as { displayName: string }).displayName?.trim())) {
       throw new ErrorEx(
         ErrorCodes.INVALID_PARAMETERS,
-        `Either First name |${data.firstName}| and last name |${data.lastName}| or Full name |${data.fullName}| is required`,
+        `Either First name |${data.firstName}| and last name |${data.lastName}| or Display name |${data.displayName}| is required`,
+      );
+    }
+
+    if (!(data as { phoneNumber: string }).phoneNumber?.trim() || !isValidE164((data as { phoneNumber: string }).phoneNumber)) {
+      throw new ErrorEx(
+        ErrorCodes.INVALID_PARAMETERS,
+        `Phone Number |${data.phoneNumber}| is required and must be a E.164 complaint phone number.`,
+      );
+    }
+
+    const multiFactor = (data as {multiFactor: MultiFactor}).multiFactor;
+    const multiFactorPhoneNumber = (data as {multiFactorPhoneNumber: string})?.multiFactorPhoneNumber ||
+      multiFactor?.enrollmentFactors[0]?.phoneNumber || (data as {phoneNumber: string})?.phoneNumber;
+
+    if (!multiFactorPhoneNumber) {
+      throw new ErrorEx(
+        ErrorCodes.INVALID_PARAMETERS,
+        `Multi factor phone number is required either in the field multiFactorPhoneNumber |${data.multiFactorPhoneNumber}| ` +
+        `or in the filed phoneNumber |${data.phoneNumber}| multiFactor|${JSON.stringify(multiFactor)}|`,
       );
     }
 
     const record = data;
 
-
-    this.#id = (record as {id: string}).id;
+    this.#id = (record as {id: string}).id || (record as {uid: string}).uid || (record as {emailId: string}).emailId;
     this.#emailId = (record as {emailId: string}).emailId;
-    this.#firstName = Helper.capitalizedString(((record as {firstName: string}).firstName || Helper.extractFirstName(record.fullName as string))) || "";
-    this.#lastName = Helper.capitalizedString(((record as {lastName: string}).lastName || Helper.extractLastName(record.fullName as string))) || "";
-    this.#superAdmin = (record as {superAdmin: boolean}).superAdmin || false;
+    this.#firstName = Helper.capitalizedString(
+      (record as {firstName: string}).firstName || Helper.extractFirstName((record as {displayName: string}).displayName)
+    );
+    this.#lastName = Helper.capitalizedString(
+      (record as {lastName: string}).lastName || Helper.extractLastName((record as {displayName: string}).displayName)
+    );
+    this.#phoneNumber = (record as {phoneNumber: string}).phoneNumber;
+    this.#multiFactorPhoneNumber = multiFactorPhoneNumber;
 
     this.#profilePhoto = {
-      url: (record as { profilePhoto: { url: string | null } })?.profilePhoto?.url as string | null ?? null,
-      displayName: (record as { profilePhoto: { url: string | null } })?.profilePhoto.url ?
+      url: (record as { profilePhoto: { url: string | null } })?.profilePhoto?.url as string | null ??
+      (record as {profileURL: string}).profileURL ?? null,
+      displayName: (record as { profilePhoto: { url: string | null } })?.profilePhoto?.url || (record as {profileURL: string})?.profileURL ?
         ((record as { profilePhoto: { displayName: string | null } })?.profilePhoto?.displayName as string | null ?? `${record?.firstName} ${record?.lastName}` ?? null) :
         null,
     };
-
-    this.#profileColour = (record as { profileColour?: string | null }).profileColour || null;
-    this.#phoneNumber = (record as { phoneNumber?: string }).phoneNumber || "";
-    this.#addressId = (record as { addressId?: string }).addressId || "";
-    this.#dob = (record as { dob?: Date | null }).dob || null;
-
-    this.#createdAt = (record as { createdAt?: Date }).createdAt || new Date();
-    this.#createdBy = (record as { createdBy?: string }).createdBy || ""; // TODO: Get current user
-    this.#lastUpdatedAt = (record as { lastUpdatedAt?: Date }).lastUpdatedAt || new Date();
-    this.#lastUpdatedBy = (record as { lastUpdatedBy?: string }).lastUpdatedBy || ""; // TODO: Get current user
   }
 
   /**
@@ -109,7 +120,7 @@ export class User implements IUser {
   }
 
   /**
-   * Gets the last name of the user.
+   * Gets the first name of the user.
    *
    * @type {string}
    */
@@ -118,12 +129,19 @@ export class User implements IUser {
   }
 
   /**
-   * Gets the superAdmin flag of the user.
-   *
+   * Gets the phone number used for multi factor autnetication
    * @type {string}
    */
-  get superAdmin(): boolean {
-    return this.#superAdmin;
+  get phoneNumber(): string {
+    return this.#phoneNumber;
+  }
+
+  /**
+   * Gets the second phone number used as a backup multi factor autnetication option
+   * @type {string}
+   */
+  get multiFactorPhoneNumber(): string {
+    return this.#multiFactorPhoneNumber;
   }
 
   /**
@@ -134,70 +152,6 @@ export class User implements IUser {
    */
   get profilePhoto() {
     return this.#profilePhoto;
-  }
-
-  /**
-   * Gets the user's profile colour.
-   * @return {string | null} The profile colour of the user.
-   */
-  get profileColour(): string | null {
-    return this.#profileColour;
-  }
-
-  /**
-   * Gets the user's phone number.
-   * @return {string | null} The phone number of the user.
-   */
-  get phoneNumber(): string | null {
-    return this.#phoneNumber;
-  }
-
-  /**
-   * Gets the user's address ID.
-   * @return {string | null} The address ID of the user.
-   */
-  get addressId(): string | null {
-    return this.#addressId;
-  }
-
-  /**
-   * Gets the user's date of birth.
-   * @return {Date | null} The date of birth of the user.
-   */
-  get dob(): Date | null {
-    return this.#dob;
-  }
-
-  /**
-   * Gets the date when the user profile was created.
-   * @return {Date} The creation date of the user profile.
-   */
-  get createdAt(): Date {
-    return this.#createdAt;
-  }
-
-  /**
-   * Gets the ID of the user who created this profile.
-   * @return {string} The ID of the creator of the user profile.
-   */
-  get createdBy(): string {
-    return this.#createdBy;
-  }
-
-  /**
-   * Gets the date when the user profile was last updated.
-   * @return {Date} The last updated date of the user profile.
-   */
-  get lastUpdatedAt(): Date {
-    return this.#lastUpdatedAt;
-  }
-
-  /**
-   * Gets the ID of the user who last updated this profile.
-   * @return {string} The ID of the person who last updated the user profile.
-   */
-  get lastUpdatedBy(): string {
-    return this.#lastUpdatedBy;
   }
 
   /**
@@ -244,12 +198,23 @@ export class User implements IUser {
     const fullJson = this.toJson();
 
     // Destructure the `id` field out and return the rest
-    // remove id as well as firebase user
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const {id, firebase, ...rest} = fullJson;
+    const {id, emailId, firstName, lastName, phoneNumber, multiFactorPhoneNumber, profilePhoto} = fullJson;
+
+    const multiFactor = {
+      enrollmentFactors: [{
+        phoneNumber: multiFactorPhoneNumber || phoneNumber,
+        displayName: "Primary phone number",
+        factorId: "phone", // PhoneMultiFactorGenerator.FACTOR_ID,
+      }],
+    };
+
+    const profileURL = (profilePhoto as {url: string})?.url?.trim() || null;
 
     // Return the JSON object excluding the `id` field
-    return rest;
+    return {email: emailId, displayName: `${firstName} ${lastName}`, phoneNumber, multiFactor,
+      ...(profileURL ? {profileURL} : {}),
+    };
   }
 
   /**
@@ -263,20 +228,13 @@ export class User implements IUser {
   // Ensure that all keys are checked and compared correctly
     return (
       this.#id !== after.id ||
-      this.emailId !== after.emailId ||
-      this.#firstName !== after.firstName ||
-      this.#lastName !== after.lastName ||
-      this.#superAdmin !== after.superAdmin // ||
+      this.#emailId !== after.emailId ||
+      // this.#firstName !== after.firstName ||
+      // this.#lastName !== after.lastName ||
+      this.#phoneNumber !== after.phoneNumber ||
+      this.#multiFactorPhoneNumber !== after.multiFactorPhoneNumber // ||
       // this.profilePhoto.url !== after.profilePhoto.url ||
       // this.profilePhoto.displayName !== after.profilePhoto.displayName ||
-      // this.#profileColour !== after.profileColour ||
-      // this.phoneNumber !== after.phoneNumber ||
-      // this.#addressId !== after.addressId ||
-      // this.#dob !== after.dob ||
-      // this.#createdAt !== after.createdAt ||
-      // this.#createdBy != after.createdBy ||
-      // this.#lastUpdatedAt !== after.lastUpdatedAt ||
-      // this.#lastUpdatedBy !== after.lastUpdatedBy
     );
   }
 }
