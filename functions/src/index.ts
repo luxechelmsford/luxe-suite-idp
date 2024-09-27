@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 
 import {defaultRegion} from "./configs/firebase";
 import {Auth} from "./middlewares/common/auth";
+import {authApp} from "./collections/auth/authApp";
 import {providerApp} from "./collections/provider/providerApp";
 import {userApp} from "./collections/user/userApp";
 import {userProfileApp} from "./collections/userProfile/userProfileApp";
@@ -87,6 +88,7 @@ app.use((req, res, next) => {
 });
 
 // Attach all applications to the middleware
+app.use("/api/v1/auth", authApp);
 app.use("/api/v1/provider", providerApp);
 app.use("/api/v1/users", userApp);
 app.use("/api/v1/user-profiles", userProfileApp);

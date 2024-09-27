@@ -8,6 +8,8 @@
     "build:watch": "cd functions && npm run lint && esbuild src/index.ts --bundle --platform=node --target=node14 --outdir=lib --watch && cd ..",
     "build:debug": "cd functions && npm run lint && esbuild src/index.ts --bundle --platform=node --target=node14 --outdir=lib --debug && cd ..",
     "serve": "npm run build && firebase emulators:start",
+    "serve:auth": "npm run build && FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 firebase emulators:start",
+
     "deploy": "npm run build && firebase deploy",
     "deploy:debug": "npm run build && firebase deploy --debug",
     "shell": "npm run build && firebase functions:shell",

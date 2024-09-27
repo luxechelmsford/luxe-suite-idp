@@ -11,7 +11,7 @@ import Lock from "../utils/lock";
  */
 export const onGlobalUserCreate = functions.region(defaultRegion).auth.user().onCreate(async (user) => {
   const uid = user.uid;
-  const emailId = user.emailId || "N/A"; // Handle cases where emailId might be null
+  const emailId = user.email || "N/A"; // Handle cases where emailId might be null
   const fullName = user.displayName || "N/A"; // Handle cases where displayName might be null
   const profileURL = user.photoURL || "N/A"; // Assuming `photoURL` can be used as `profileURL`
 
@@ -106,7 +106,7 @@ export const onGlobalProfileUpdate = functions.region(defaultRegion).database
       const newSuperAdmin = after.superAdmin || false;
 
       // Extract relevant fields
-      const emailId = userRecord.emailId || "";
+      const emailId = userRecord.email || "";
       const fullName = userRecord.displayName || "";
 
       // Create an instance of the Lock class

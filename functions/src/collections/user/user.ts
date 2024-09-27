@@ -64,10 +64,10 @@ export class User implements IUser {
     this.#superAdmin = (record as {superAdmin: boolean}).superAdmin || false;
 
     this.#profilePhoto = {
-      url: (record as { profilePhoto: { url: string | null } })?.profilePhoto?.url as string | null ?? null,
-      displayName: (record as { profilePhoto: { url: string | null } })?.profilePhoto.url ?
-        ((record as { profilePhoto: { displayName: string | null } })?.profilePhoto?.displayName as string | null ?? `${record?.firstName} ${record?.lastName}` ?? null) :
-        null,
+      url: (record?.profilePhoto as { url?: string })?.url ??
+        ((record as {profileURL: string}).profileURL ?? null),
+      displayName: ((record?.profilePhoto as { displayName?: string })?.displayName) ??
+        (`${record?.firstName || ""} ${record?.lastName || ""}`.trim() || null),
     };
 
     this.#profileColour = (record as { profileColour?: string | null }).profileColour || null;

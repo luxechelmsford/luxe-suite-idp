@@ -190,7 +190,7 @@ export class Auth {
 
       try {
         // Verify the ID Token
-        console.log("Decoding id token");
+        console.log(`Decoding id token: |${idToken}|`);
         extendedDecodedIdToken = await auth.verifyIdToken(idToken) as IExtendedDecodedIdToken;
         console.log("ID Token correctly decoded", extendedDecodedIdToken);
       } catch (error) {

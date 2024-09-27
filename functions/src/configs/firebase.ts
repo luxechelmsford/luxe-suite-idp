@@ -13,6 +13,7 @@ const appName = "";
 const idpAppName = "idpApp";
 const idpDatabaseUrl = "https://luxe-suite-idp-default-rtdb.europe-west1.firebasedatabase.app/";
 const skipIdTokenCheck = false;
+
 /*
  * do not copy thos accross the various projects - end
  *
@@ -71,6 +72,7 @@ if (idpAppName) {
  */
 // Initialize auth realtime db aad firestre instances with smilar JSON naming conventions
 export const auth = admin.auth(idpApp);
+// [END auth_emulator_connect_modular]}
 export const database = admin.database(idpApp);
 
 // Initialize OAuth2 client

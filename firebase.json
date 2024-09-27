@@ -25,6 +25,9 @@
       "enabled": true,
       "port": 4001
     },
+    "hub": {
+      "port": 4401
+    },
     "logging": {
       "port": 4501
     },
