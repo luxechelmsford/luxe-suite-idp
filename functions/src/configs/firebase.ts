@@ -74,6 +74,14 @@ if (idpAppName) {
 export const auth = admin.auth(idpApp);
 // [END auth_emulator_connect_modular]}
 export const database = admin.database(idpApp);
+export const firestore = admin.firestore(idpApp);
+
+// Setting Firestore settings to follow simulate JSON naming conventions
+firestore.settings({
+  ignoreUndefinedProperties: true,
+  timestampsInSnapshots: true,
+  // Add more settings if needed for Simsilat convention
+});
 
 // Initialize OAuth2 client
 export const oAuth2Client = new google.auth.OAuth2(

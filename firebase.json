@@ -49,13 +49,6 @@
           "functionId": "api",
           "region": "europe-west2"
         }
-      },
-      {
-        "source": "/internalApi/**",
-        "function": {
-          "functionId": "internalApi",
-          "region": "europe-west2"
-        }
       }
     ]
   }

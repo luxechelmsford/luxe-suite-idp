@@ -48,8 +48,8 @@ export class UserController {
       return;
     }
 
-    if (!(data as {id: string}).id && !(data as {emailId: string}).emailId) {
-      throw new ErrorEx(ErrorCodes.INVALID_PARAMETERS, `Id |${data.id}| or Email |${data.emailId}| is required.`);
+    if (!(data as {id: string}).id && !(data as {email: string}).email) {
+      throw new ErrorEx(ErrorCodes.INVALID_PARAMETERS, `Id |${data.id}| or Email |${data.email}| is required.`);
     }
 
     try {
@@ -63,10 +63,10 @@ export class UserController {
         firebaseUser = await firebaseUserControlller.create(data, req.headers?.origin || req.headers?.referer || defaultOriginUrl);
       } catch (error) {
         if ((error as FirebaseError).code !== "auth/uid-already-exists") {
-          console.error(`Error while retrieving user |${data.emailId}|. Last error:`, error);
+          console.error(`Error while retrieving user |${data.email}|. Last error:`, error);
           throw error;
         }
-        firebaseUser = await firebaseUserControlller.read(data.id || data.emailId);
+        firebaseUser = await firebaseUserControlller.read(data.id || data.email);
       }
 
       if ((data as {id: string}).id && (data as {id: string}).id !== (firebaseUser as {id: string}).id) {
@@ -76,16 +76,16 @@ export class UserController {
         );
       }
 
-      if ((data as {emailId: string}).emailId !== (firebaseUser as {emailId: string}).emailId) {
+      if ((data as {email: string}).email !== (firebaseUser as {email: string}).email) {
         throw new ErrorEx(
           ErrorCodes.INVALID_DATA,
-          `Email |${firebaseUser.emailId}| is a readonly property and cannot be changed to |${data.emailId}|`
+          `Email |${firebaseUser.email}| is a readonly property and cannot be changed to |${data.email}|`
         );
       }
 
       // Create an instance of ProviderUserDataStore to handle the create operation
       // And perform the create operation with the provided ID and data
-      const dataStore = new UserDataStore(req.provider?.id as string);
+      const dataStore = new UserDataStore();
       const result = await dataStore.createWithId(firebaseUser.id as string,
         {...newUser.dbJson(), hashedPin: new UserPin(data).hashedPin}
       );
@@ -180,16 +180,16 @@ export class UserController {
         );
       }
 
-      if ((data as {emailId: string}).emailId !== (firebaseUser as {emailId: string}).emailId) {
+      if ((data as {email: string}).email !== (firebaseUser as {email: string}).email) {
         throw new ErrorEx(
           ErrorCodes.INVALID_DATA,
-          `Email |${firebaseUser.emailId}| is a readonly property and cannot be changed to |${data.emailId}|`
+          `Email |${firebaseUser.email}| is a readonly property and cannot be changed to |${data.email}|`
         );
       }
 
       // Create an instance of ProviderUserDataStore to handle the update operation
       // And perform the update operation with the provided ID and data
-      const dataStore = new UserDataStore(req.provider?.id as string);
+      const dataStore = new UserDataStore();
       const result = await dataStore.transactionalUpdate(userId,
         {...newUser.dbJson(), hashedPin: new UserPin(data).hashedPin}
       );
@@ -263,7 +263,7 @@ export class UserController {
         return;
       }
 
-      const dataStore = new UserDataStore(req.provider?.id as string);
+      const dataStore = new UserDataStore();
       const result = await dataStore.read(userId);
 
       const after = new User(result as {[key: string]: unknown});
@@ -297,7 +297,7 @@ export class UserController {
 
       console.log(`In getList with filter: |${filter}|, sort: |${sort}|, range: |${range}| & pageInfo |${pageInfo}|`);
 
-      const dataStore = new UserDataStore(req.provider?.id as string);
+      const dataStore = new UserDataStore();
       const result = await dataStore.query(filter as string, sort as string, range as string, pageInfo as string);
 
       if (!result) {
@@ -361,7 +361,7 @@ export class UserController {
       }
 
       // Create an instance of user data store
-      const dataStore = new UserDataStore(req.provider?.id as string);
+      const dataStore = new UserDataStore();
 
       // Delete the record
       const result = await dataStore.delete(userId);

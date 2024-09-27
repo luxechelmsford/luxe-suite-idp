@@ -1,31 +1,30 @@
 // Import necessary types and data store implementations
-import {RealtimeDbDataStore} from "../models/realtimeDbDataStore";
+import {FirestoreDataStore} from "../models/firestoreDataStore";
 import {CreateIdOption} from "../types/createIdOption";
 import {FirebaseDataStoreOptions} from "../models/firebaseDataStoreOptions";
-import {RealtimeDbUserDataStore} from "./realtimeDb/realtimeDbUserDataStore";
+import {FirestorePathBuilder} from "../models/firestorePathBuilder";
 
 /**
  * UserDataStore class representing a provider user data store that abstracts the underlying data store.
  * The design ensures complete abstraction from the consumers in terms of what data
  * is stored and managed, allowing the data provider to be changed seamlessly.
- * It wraps around RealtimeDbDataStore to provide an interface for user-specific data operations.
- * This class delegates all operations to an instance of RealtimeDbDataStore.
+ * It wraps around FirestoreDataStore to provide an interface for user-specific data operations.
+ * This class delegates all operations to an instance of FirestoreDataStore.
  */
 export class UserDataStore {
-  private dataStore: RealtimeDbDataStore;
+  private dataStore: FirestoreDataStore;
 
   /**
    * Creates an instance of UserDataStore.
    *
-   * @param {string} providerId - The path to initialize the database reference.
-   * @param {RealtimeDbDataStoreOptions} [options=new RealtimeDbDataStoreOptions()] - The options for configuring
+   * @param {FirestoreDataStoreOptions} [options=new FirestoreDataStoreOptions()] - The options for configuring
    *                         the data store. This includes settings related to the realtime database
    *                         instance and other operational parameters. If not provided,
    *                         default options will be used.
    */
-  constructor(providerId: string) {
-    this.dataStore = new RealtimeDbUserDataStore(
-      providerId,
+  constructor() {
+    this.dataStore = new FirestoreDataStore(
+      FirestorePathBuilder.users(),
       new FirebaseDataStoreOptions({
         createIdOption: CreateIdOption.ManualRejectIdConflicts,
         requireTransaction: true,

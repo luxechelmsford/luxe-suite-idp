@@ -171,7 +171,7 @@ export class UserProfileController {
 
       const after = new User(data);
 
-      const dataStore = new UserDataStore(req.provider?.id as string);
+      const dataStore = new UserDataStore();
       const result = await dataStore.transactionalUpdate(after.id, after.dbJson());
 
       if (!result) {
@@ -254,7 +254,7 @@ export class UserProfileController {
         return;
       }
 
-      const dataStore = new UserDataStore(req.provider?.id as string);
+      const dataStore = new UserDataStore();
       const result = await dataStore.read(userId);
 
       const after = new User(result as {[key: string]: unknown});

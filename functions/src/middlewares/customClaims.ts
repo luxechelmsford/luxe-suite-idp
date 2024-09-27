@@ -68,7 +68,7 @@ export class CustomClaims {
         this.#customClaims : (await auth.getUser(this.#uid))?.customClaims || {};
       console.debug(`+++======= before: |${JSON.stringify(before)}|`);
 
-      const after = JSON.parse(JSON.stringify(JSON.stringify(before)));
+      const after = JSON.parse(JSON.stringify(before));
       after.superAdmin = this.#superAdmin || false;
       console.debug(`+++======= after: |${JSON.stringify(after)}|`);
 
