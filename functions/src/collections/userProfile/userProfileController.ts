@@ -4,6 +4,7 @@ import {UserDataStore} from "../../dataStores/collections/userDataStore";
 import {ErrorCodes, ErrorEx} from "../../types/errorEx";
 import {Auth} from "../../middlewares/common/auth";
 import {FirebaseUserController} from "../user/firebaseUser/firebaseUserController";
+import {UserPin} from "../user/userPin";
 
 /**
  * Handles user profile related operations.
@@ -18,88 +19,6 @@ export class UserProfileController {
   // private getuserProfileHistoryRootPath(req: Request): string {
   //  return DatabasePaths.userProfileHistories(req.provider?.id as string);
   // }
-
-
-  /**
-   * Creates a new user profile.
-   * @param {Request} req - The HTTP request object.
-   * @param {Response} res - The HTTP response object.
-   * return {Promise<void>}
-   */
-  /*
-  @Auth.requiresRoleOrAccessLevel(null, 2, [])
-  public async create(req: Request, res: Response): Promise<void> {
-    let userProfileJson: {[key: string]: unknown} = {};
-
-    const {forced, data} = req.body;
-
-    // todo handle forced flag
-    console.log(`Forced flag: |${forced}|`);
-
-    // Check if the 'data' node exists
-    if (!data) {
-      res.status(400).json({
-        status: "Failed",
-        message: `Data |${req.body.data}| is required.`,
-        code: ErrorCodes.INVALID_PARAMETERS,
-      });
-      return;
-    }
-
-    try {
-      // profile creation would require the id
-      if (data.id != req.extendedDecodedIdToken?.uid) {
-        res.status(401).json({
-          status: "Failed",
-          message: "Unauthorised!! User can only update its own profile",
-          code: ErrorCodes.AUTH_FAILURE,
-        });
-        return;
-      }
-
-      // Create an instance of User to handle validation and unique ID
-      const before = new User(data);
-
-      // Create an instance of UserDataStore to handle the create operation
-      const dataStore = new UserDataStore(req.provider?.id as string);
-
-      // Perform the create operation with the provided ID and data
-      const result = await dataStore.createWithId(before.id, before.dbJson());
-
-      if (!result) {
-        throw new ErrorEx(
-          ErrorCodes.RECORD_CREATE_FAILED,
-          `Failed to create user profile |${before.id}|`
-        );
-      }
-
-      console.debug(`User profile created ***** |${JSON.stringify(result)}|`);
-
-      // Create a new instance of User with the returned data
-      const after = new User(result as {[key: string]: unknown});
-
-      console.debug(`After created ***** |${JSON.stringify(after)}|`);
-
-      // Convert the final user 'profile data to JSON format for the response
-      userProfileJson = after.toJson() || {};
-      console.log(`User created with data |${JSON.stringify(after)}|`);
-    } catch (error) {
-      console.error(error);
-      res.status(400).json({
-        status: "Failed",
-        message: `Error creating user profile |${data.firstName} |${data.lastName}|. Last Error |${(error as Error).message}|`,
-        code: ErrorCodes.UNKNOWN_ERROR,
-      });
-      return; // Ensure that the error response terminates the function
-    }
-
-    // Send success response with the user profile JSON data
-    res.status(200).json({
-      status: "Success",
-      message: "User created successfully",
-      data: userProfileJson,
-    });
-  }*/
 
 
   /**
@@ -133,7 +52,7 @@ export class UserProfileController {
       }
 
       // Check if the 'data' node exists
-      const {data} = req.body;
+      let {data} = req.body;
       if (!data) {
         res.status(400).json({
           status: "Failed",
@@ -142,6 +61,12 @@ export class UserProfileController {
         });
         return;
       }
+
+      // add lastUpdatedBy to data node
+      data = {...data, lastUpdatedBy: req?.currentUid};
+
+      // Create the provider user object and let the constructor validates the data
+      const newUser = new User(data);
 
       if ((data as {emailId: string}).emailId != req.extendedDecodedIdToken?.emailId) {
         res.status(401).json({
@@ -169,29 +94,32 @@ export class UserProfileController {
         );
       }
 
-      const after = new User(data);
-
+      // Create an instance of UserDataStore to handle the update operation
+      // And perform the update operation with the provided ID and data
+      // Append hashed pin if provided in the data
       const dataStore = new UserDataStore();
-      const result = await dataStore.transactionalUpdate(after.id, after.dbJson());
+      const result = await dataStore.transactionalUpdate(userId,
+        {...newUser.dbJSON(), hashedPin: new UserPin(data).hashedPin}
+      );
 
       if (!result) {
         throw new ErrorEx(
           ErrorCodes.RECORD_UPDATE_FAILED,
-          `Failed to update user profile |${after.id}|`
+          `Failed to update user profile |${userId}|`
         );
       }
 
       console.debug(`Creating user profile history record for |${JSON.stringify(result)}|`);
       const before = new User(result as {[key: string]: unknown});
 
-      console.debug(`User profile updated from |${JSON.stringify(before)}| to |${JSON.stringify(after)}|`);
+      console.debug(`User profile updated from |${JSON.stringify(before)}| to |${JSON.stringify(newUser)}|`);
 
       /*
-      if (before.historyRequired(after.toJson())) {
+      if (before.historyRequired(after.toJSON())) {
         console.debug("About to create an instance of the user profile history record");
         const history = new HistoryImpl(
           "",
-          before.toJson(),
+          before.toJSON(),
           "update",
           new Date(),
           req.extendedDecodedIdToken?.uid || ""
@@ -201,12 +129,12 @@ export class UserProfileController {
         const dataStoreHistory = new HistoryDataStore(req.provider?.id as string, HistoryType.User);
 
         console.debug("About to add a user profile history record to firestore");
-        const resultHistory = await dataStoreHistory.create(history.dbJson());
+        const resultHistory = await dataStoreHistory.create(history.dbJSON());
         console.debug(`User Profile History |${resultHistory}| for user profile |${after.id}| created ` +
           `successfully after user profile updates`);
       }*/
 
-      userProfileJson = after.toJson() || {};
+      userProfileJson = newUser.toJSON() || {};
     } catch (error) {
       console.error(error);
       res.status(400).json({
@@ -258,7 +186,7 @@ export class UserProfileController {
       const result = await dataStore.read(userId);
 
       const after = new User(result as {[key: string]: unknown});
-      userProfileJson = after.toJson() || {};
+      userProfileJson = after.toJSON() || {};
     } catch (error) {
       console.error(error);
       res.status(400).json({
@@ -273,118 +201,4 @@ export class UserProfileController {
       data: userProfileJson,
     });
   }
-
-  /**
-   * Handles querying for a list of user profiles based on filters, sorting, and range.
-   * @param {Request} req - The HTTP request object containing query parameters.
-   * @param {Response} res - The HTTP response object to send the result.
-   * @return {Promise<void>}
-   */
-  /*
-  @Auth.requiresRoleOrAccessLevel(null, 0, [])
-  public async query(req: Request, res: Response): Promise<void> {
-    let userProfileJsons: {[key: string]: unknown}[] = [];
-    try {
-      const {filter, sort, range, pageInfo} = req.query;
-
-      console.log(`In getList with filter: |${filter}|, sort: |${sort}|, range: |${range}| & pageInfo |${pageInfo}|`);
-
-      const dataStore = new UserDataStore(req.provider?.id as string);
-      const result = await dataStore.query(filter as string, sort as string, range as string, pageInfo as string);
-
-      if (!result) {
-        throw new ErrorEx(
-          ErrorCodes.RECORD_QUERY_FAILED,
-          "Failed to query user profile records"
-        );
-      }
-
-      userProfileJsons = (result.data || []).map((item) => {
-        const after = new User(item as {[key: string]: unknown});
-        return after.toJson();
-      }) || [];
-
-      res.setHeader("X-Content-Range", `items ${result.rangeStart}-${result.rangeEnd}/${result.totalCount}`);
-    } catch (error) {
-      console.error(error);
-      res.status(400).json({
-        status: "Failed",
-        message: `Error retrieving user profile list: |${(error as Error).message}|`,
-        code: ErrorCodes.UNKNOWN_ERROR,
-      });
-    }
-
-    // console.debug(`Query executed successfully with data |${JSON.stringify(user profileJsons)}|`);
-
-    res.status(200).json({
-      status: "Success",
-      message: "user profiles retrieved successfully",
-      data: userProfileJsons,
-    });
-  }*/
-
-  /**
-   * Deletes a user profile by ID.
-   * @param {Request} req - The HTTP request object.
-   * @param {Response} res - The HTTP response object.
-   * return {Promise<void>}
-   */
-  /*
-  @Auth.requiresRoleOrAccessLevel(null, 1, [])
-  public async delete(req: Request, res: Response): Promise<void> {
-    let userProfileJson: {[key: string]: unknown} = {};
-    try {
-      const userId = req.params.id;
-
-      if (!userId || userId.trim().length === 0) {
-        res.status(400).json({
-          status: "Failed",
-          message: "User profile id must be passed",
-          code: ErrorCodes.INVALID_PARAMETERS,
-        });
-        return;
-      }
-
-      // Create an instance of user profile data store
-      const dataStore = new UserDataStore(req.provider?.id as string);
-
-      // Delete the record
-      const result = await dataStore.delete(userId);
-      const before = new User(result as {[key: string]: unknown});
-      userProfileJson = before.toJson();
-
-      console.debug(`User profile History for user profile with ID |${before.id}| deleted successfully`);
-
-      // // Create a history record for the user profile deletion
-      // const history = new HistoryImpl(
-      //   "", // Assuming ID will be auto-generated
-      //   before.toJson(),
-      //   "update", // Action type
-      //   new Date(),
-      //  req.extendedDecodedIdToken?.uid || ""
-      // );
-
-      // // Create an instance of history data store
-      // const dataStoreHistory = new HistoryDataStore(req.provider?.id as string, HistoryType.User);
-
-      // // Record the deletion in history
-      // const resultHistory = await dataStoreHistory.create(history.dbJson());
-      // console.debug(`User profile History |${resultHistory}| for user profile |${before.id}| ` +
-        `created successfully after user profile deletion`);
-    } catch (error) {
-      console.error(error);
-      res.status(400).json({
-        status: "Failed",
-        message: `Error deleting user profile |${req.params.id}|. Last Error |${(error as Error).message}|`,
-        code: ErrorCodes.UNKNOWN_ERROR,
-      });
-      return;
-    }
-
-    res.status(200).json({
-      status: "Success",
-      message: "User profile deleted successfully",
-      data: userProfileJson,
-    });
-  }*/
 }

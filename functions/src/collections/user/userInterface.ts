@@ -115,7 +115,7 @@ export interface IUser {
    * @return {Object.<string, unknown>} A JSON object representing all properties of the instance,
    * including private and protected fields if accessible.
    */
-  toJson() : {[key: string]: unknown};
+  toJSON() : {[key: string]: unknown};
 
   /**
    * Gets the JSON representation of the object suitable for database storage,
@@ -127,7 +127,7 @@ export interface IUser {
    *
    * @return {Object.<string, unknown>} A JSON object representing the properties of the instance, excluding the `id` field.
    */
-  dbJson(): {[key: string]: unknown};
+  dbJSON(): {[key: string]: unknown};
 
   /**
    * Determines whether the key properties of a user object has been modified compared to a previous state.

@@ -33,7 +33,7 @@ export class UserController {
   public async create(req: Request, res: Response): Promise<void> {
     let userJson: {[key: string]: unknown} = {};
 
-    const {forced, data} = req.body;
+    let {forced, data} = req.body;
 
     // todo handle forced flag
     console.log(`Forced flag: |${forced}|`);
@@ -48,9 +48,8 @@ export class UserController {
       return;
     }
 
-    if (!(data as {id: string}).id && !(data as {email: string}).email) {
-      throw new ErrorEx(ErrorCodes.INVALID_PARAMETERS, `Id |${data.id}| or Email |${data.email}| is required.`);
-    }
+    // add createdBy and lastUpdatedBy to data node
+    data = {...data, createdBy: req?.currentUid, lastUpdatedBy: req?.currentUid};
 
     try {
       // Create the provider user object and let the constructor validates the data
@@ -83,11 +82,12 @@ export class UserController {
         );
       }
 
-      // Create an instance of ProviderUserDataStore to handle the create operation
+      // Create an instance of UserDataStore to handle the create operation
       // And perform the create operation with the provided ID and data
+      // Append hashed pin if provided in the data
       const dataStore = new UserDataStore();
       const result = await dataStore.createWithId(firebaseUser.id as string,
-        {...newUser.dbJson(), hashedPin: new UserPin(data).hashedPin}
+        {...newUser.dbJSON(), hashedPin: new UserPin(data).hashedPin}
       );
 
       if (!result) {
@@ -105,7 +105,7 @@ export class UserController {
       console.debug(`After created ***** |${JSON.stringify(createdUser)}|`);
 
       // Convert the final user data to JSON format for the response
-      userJson = createdUser.toJson() || {};
+      userJson = createdUser.toJSON() || {};
       console.log(`User created with data |${JSON.stringify(createdUser)}|`);
     } catch (error) {
       console.error(error);
@@ -148,7 +148,7 @@ export class UserController {
       }
 
       // Check if the 'data' node exists
-      const {data} = req.body;
+      let {data} = req.body;
       if (!data) {
         res.status(400).json({
           status: "Failed",
@@ -157,6 +157,9 @@ export class UserController {
         });
         return;
       }
+
+      // add lastUpdatedBy to data node
+      data = {...data, lastUpdatedBy: req?.currentUid};
 
       // Create the provider user object and let the constructor validates the data
       const newUser = new User(data);
@@ -187,11 +190,12 @@ export class UserController {
         );
       }
 
-      // Create an instance of ProviderUserDataStore to handle the update operation
+      // Create an instance of UserDataStore to handle the update operation
       // And perform the update operation with the provided ID and data
+      // Append hashed pin if provided in the data
       const dataStore = new UserDataStore();
       const result = await dataStore.transactionalUpdate(userId,
-        {...newUser.dbJson(), hashedPin: new UserPin(data).hashedPin}
+        {...newUser.dbJSON(), hashedPin: new UserPin(data).hashedPin}
       );
 
       if (!result) {
@@ -206,11 +210,11 @@ export class UserController {
 
       /*
       console.debug(`Creating user history record for |${JSON.stringify(result)}|`);
-      if (before.historyRequired(newUser.toJson())) {
+      if (before.historyRequired(newUser.toJSON())) {
         console.debug("About to create an instance of the user history record");
         const history = new HistoryImpl(
           "",
-          before.toJson(),
+          before.toJSON(),
           "update",
           new Date(),
           req.extendedDecodedIdToken?.uid || ""
@@ -220,11 +224,11 @@ export class UserController {
         const dataStoreHistory = new HistoryDataStore(req.provider?.id as string, HistoryType.user);
 
         console.debug("About to add a user history record to firestore");
-        const resultHistory = await dataStoreHistory.create(history.dbJson());
+        const resultHistory = await dataStoreHistory.create(history.dbJSON());
         console.debug(`User History |${resultHistory}| for user |${userId}| created successfully after user updates`);
       }*/
 
-      userJson = newUser.toJson() || {};
+      userJson = newUser.toJSON() || {};
     } catch (error) {
       console.error(error);
       res.status(400).json({
@@ -267,7 +271,7 @@ export class UserController {
       const result = await dataStore.read(userId);
 
       const after = new User(result as {[key: string]: unknown});
-      userJson = after.toJson() || {};
+      userJson = after.toJSON() || {};
     } catch (error) {
       console.error(error);
       res.status(400).json({
@@ -309,7 +313,7 @@ export class UserController {
 
       userJsons = (result.data || []).map((item) => {
         const after = new User(item as {[key: string]: unknown});
-        return after.toJson();
+        return after.toJSON();
       }) || [];
 
       res.setHeader("X-Content-Range", `items ${result.rangeStart}-${result.rangeEnd}/${result.totalCount}`);
@@ -366,7 +370,7 @@ export class UserController {
       // Delete the record
       const result = await dataStore.delete(userId);
       const before = new User(result as {[key: string]: unknown});
-      userJson = before.toJson();
+      userJson = before.toJSON();
 
       console.debug(`User History for user with ID |${before.id}| deleted successfully`);
 
@@ -374,7 +378,7 @@ export class UserController {
       // Create a history record for the user deletion
       const history = new HistoryImpl(
         "", // Assuming ID will be auto-generated
-        before.toJson(),
+        before.toJSON(),
         "update", // Action type
         new Date(),
         req.extendedDecodedIdToken?.uid || ""
@@ -384,7 +388,7 @@ export class UserController {
       const dataStoreHistory = new HistoryDataStore(req.provider?.id as string, HistoryType.user);
 
       // Record the deletion in history
-      const resultHistory = await dataStoreHistory.create(history.dbJson());
+      const resultHistory = await dataStoreHistory.create(history.dbJSON());
       console.debug(`User History |${resultHistory}| for user |${before.id}| created successfully after user deletion`);
       */
     } catch (error) {

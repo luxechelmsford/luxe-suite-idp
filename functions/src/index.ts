@@ -12,7 +12,7 @@ import {userApp} from "./collections/user/userApp";
 import {userProfileApp} from "./collections/userProfile/userProfileApp";
 
 // Import triggers
-import {onUserCreated, onUserWritten} from "./triggers/userTriggers";
+import {onUserCreated, onUserSignedUp, onUserSignIn, onUserWritten} from "./triggers/userTriggers";
 // import {onProviderProfileUpdate, onUserProviderProfileDelete} from "./triggers/providerProfileTriggers";
 
 // Create the main Express application
@@ -105,4 +105,6 @@ export const api = v2.https.onRequest({region: defaultRegion}, (req, res) => {
 export {
   onUserCreated,
   onUserWritten,
+  onUserSignIn,
+  onUserSignedUp,
 };

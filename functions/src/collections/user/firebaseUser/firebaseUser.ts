@@ -162,7 +162,7 @@ export class FirebaseUser implements IFirebaseUser {
    * @return {Object.<string, unknown>} A JSON object representing all properties of the instance,
    * including private and protected fields if accessible.
    */
-  toJson(): {[key: string]: unknown} {
+  toJSON(): {[key: string]: unknown} {
     // Create a shallow copy of the instance
     const clone: {[key: string]: unknown} = Object.create(null);
 
@@ -192,9 +192,9 @@ export class FirebaseUser implements IFirebaseUser {
    *
    * @return {Object.<string, unknown>} A JSON object representing the properties of the instance, excluding the `id` field.
    */
-  dbJson(): {[key: string]: unknown} {
+  dbJSON(): {[key: string]: unknown} {
     // Get the full JSON representation of the object
-    const fullJson = this.toJson();
+    const fullJson = this.toJSON();
 
     // Destructure the `id` field out and return the rest
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
