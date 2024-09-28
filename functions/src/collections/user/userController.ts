@@ -3,10 +3,11 @@ import {User} from "./user";
 import {UserDataStore} from "../../dataStores/collections/userDataStore";
 import {ErrorCodes, ErrorEx} from "../../types/errorEx";
 import {Auth} from "../../middlewares/common/auth";
-import {FirebaseUserController} from "./firebaseUser/firebaseUserController";
-import {FirebaseError} from "firebase-admin";
 import {defaultOriginUrl} from "../../configs/firebase";
-import {UserPin} from "./userPin";
+import {FirebaseError} from "firebase-admin";
+import {FirebaseUserController} from "./firebaseUser/firebaseUserController";
+import {user} from "firebase-functions/v1/auth";
+import {DataSource} from "../../types/dataSource";
 
 /**
  * Handles user related operations.
@@ -18,13 +19,13 @@ export class UserController {
  * @param {Request} req - The HTTP request object.
  * @return {string} The root path for users, based on the provider ID from the request.
  */
-  // private getuserHistoryRootPath(req: Request): string {
-  //  return DatabasePaths.userHistories(req.provider?.id as string);
+  // private getUserHistoryRootPath(req: Request): string {
+  //  return DatabasePaths.userHistories();
   // }
 
 
   /**
-   * Creates a new User.
+   * Creates a new user.
    * @param {Request} req - The HTTP request object.
    * @param {Response} res - The HTTP response object.
    * return {Promise<void>}
@@ -37,6 +38,7 @@ export class UserController {
 
     // todo handle forced flag
     console.log(`Forced flag: |${forced}|`);
+    console.log(`Data: |${JSON.stringify(data)}|`);
 
     // Check if the 'data' node exists
     if (!data) {
@@ -51,6 +53,12 @@ export class UserController {
     // add createdBy and lastUpdatedBy to data node
     data = {...data, createdBy: req?.currentUid, lastUpdatedBy: req?.currentUid};
 
+    if (!(data as {id: string}).id && !(data as {emailId: string}).emailId) {
+      console.error(`Invalid data |${JSON.stringify(data)}|`);
+      console.error(`Id |${data.id}| or Email |${data.emailId}| is required`);
+      throw new ErrorEx(ErrorCodes.INVALID_PARAMETERS, `Id |${data.id}| or Email |${data.emailId}| is required.`);
+    }
+
     try {
       // Create the provider user object and let the constructor validates the data
       const newUser = new User(data);
@@ -62,33 +70,34 @@ export class UserController {
         firebaseUser = await firebaseUserControlller.create(data, req.headers?.origin || req.headers?.referer || defaultOriginUrl);
       } catch (error) {
         if ((error as FirebaseError).code !== "auth/uid-already-exists") {
-          console.error(`Error while retrieving user |${data.email}|. Last error:`, error);
+          console.error(`Error while retrieving user identified by Id: |${data.id}|. Last error:`, error);
           throw error;
         }
-        firebaseUser = await firebaseUserControlller.read(data.id || data.email);
+        firebaseUser = await firebaseUserControlller.read(data.id || data.emailId);
       }
 
       if ((data as {id: string}).id && (data as {id: string}).id !== (firebaseUser as {id: string}).id) {
+        console.error(`Invalid data |${JSON.stringify(data)}|`);
+        console.error(`Id |${firebaseUser.emailId}| is a readonly property and cannot be changed to |${data.id}|`);
         throw new ErrorEx(
-          ErrorCodes.INVALID_DATA,
-          `Id |${firebaseUser.id}| is a readonly property and cannot be changed to |${data.id}|`
+          ErrorCodes.INVALID_PARAMETERS,
+          `Email |${firebaseUser.id}| is a readonly property and cannot be changed to |${data.id}|`
         );
       }
 
-      if ((data as {email: string}).email !== (firebaseUser as {email: string}).email) {
+      if ((data as {emailId: string}).emailId !== (firebaseUser as {emailId: string}).emailId) {
+        console.error(`Invalid data |${JSON.stringify(data)}|`);
+        console.error(`Email |${firebaseUser.emailId}| is a readonly property and cannot be changed to |${data.emailId}|`);
         throw new ErrorEx(
-          ErrorCodes.INVALID_DATA,
-          `Email |${firebaseUser.email}| is a readonly property and cannot be changed to |${data.email}|`
+          ErrorCodes.INVALID_PARAMETERS,
+          `Email |${firebaseUser.emailId}| is a readonly property and cannot be changed to |${data.emailId}|`
         );
       }
 
       // Create an instance of UserDataStore to handle the create operation
       // And perform the create operation with the provided ID and data
-      // Append hashed pin if provided in the data
       const dataStore = new UserDataStore();
-      const result = await dataStore.createWithId(firebaseUser.id as string,
-        {...newUser.dbJSON(), hashedPin: new UserPin(data).hashedPin}
-      );
+      const result = await dataStore.createWithId(firebaseUser.id as string, newUser.dbJSON());
 
       if (!result) {
         throw new ErrorEx(
@@ -99,9 +108,8 @@ export class UserController {
 
       console.debug(`User created ***** |${JSON.stringify(result)}|`);
 
-      // Create a new instance of user with the returned data
+      // Create a new instance of User with the returned data
       const createdUser = new User(result as {[key: string]: unknown});
-
       console.debug(`After created ***** |${JSON.stringify(createdUser)}|`);
 
       // Convert the final user data to JSON format for the response
@@ -114,7 +122,7 @@ export class UserController {
         message: `Error creating user |${data.firstName} |${data.lastName}|. Last Error |${(error as Error).message}|`,
         code: ErrorCodes.UNKNOWN_ERROR,
       });
-      return; // Ensure that the error respone terminates the function
+      return; // Ensure that the error response terminates the function
     }
 
     // Send success response with the user JSON data
@@ -167,7 +175,7 @@ export class UserController {
       let firebaseUser;
       const firebaseUserControlller = new FirebaseUserController();
       try {
-        firebaseUser = await firebaseUserControlller.read(userId);
+        firebaseUser = await firebaseUserControlller.update(data);
       } catch (error) {
         if ((error as FirebaseError).code !== "auth/user-not-found") {
           console.error(error);
@@ -176,56 +184,58 @@ export class UserController {
         firebaseUser = await firebaseUserControlller.create(data, req.headers?.origin || req.headers?.referer || defaultOriginUrl);
       }
 
-      if ((data as {id: string}).id !== (firebaseUser as {id: string}).id) {
+
+      if ((data as {id: string}).id && (data as {id: string}).id !== (firebaseUser as {id: string}).id) {
+        console.error(`Invalid data |${JSON.stringify(data)}|`);
+        console.error(`Id |${firebaseUser.emailId}| is a readonly property and cannot be changed to |${data.id}|`);
         throw new ErrorEx(
-          ErrorCodes.INVALID_DATA,
-          `Id |${firebaseUser.id}| is a readonly property and cannot be changed to |${data.id}|`
+          ErrorCodes.INVALID_PARAMETERS,
+          `Email |${firebaseUser.id}| is a readonly property and cannot be changed to |${data.id}|`
         );
       }
 
-      if ((data as {email: string}).email !== (firebaseUser as {email: string}).email) {
+      if ((data as {emailId: string}).emailId !== (firebaseUser as {emailId: string}).emailId) {
+        console.error(`Invalid data |${JSON.stringify(data)}|`);
+        console.error(`Email |${firebaseUser.emailId}| is a readonly property and cannot be changed to |${data.emailId}|`);
         throw new ErrorEx(
-          ErrorCodes.INVALID_DATA,
-          `Email |${firebaseUser.email}| is a readonly property and cannot be changed to |${data.email}|`
+          ErrorCodes.INVALID_PARAMETERS,
+          `Email |${firebaseUser.emailId}| is a readonly property and cannot be changed to |${data.emailId}|`
         );
       }
 
       // Create an instance of UserDataStore to handle the update operation
       // And perform the update operation with the provided ID and data
-      // Append hashed pin if provided in the data
       const dataStore = new UserDataStore();
-      const result = await dataStore.transactionalUpdate(userId,
-        {...newUser.dbJSON(), hashedPin: new UserPin(data).hashedPin}
-      );
+      const result = await dataStore.transactionalUpdate(userId, newUser.dbJSON());
 
       if (!result) {
         throw new ErrorEx(
           ErrorCodes.RECORD_UPDATE_FAILED,
-          `Failed to update user |${userId}|`
+          `Failed to update user |${user}| with data |${newUser.id}|`
         );
       }
 
-      const before = new User(result as {[key: string]: unknown});
-      console.debug(`User updated from |${JSON.stringify(before)}| to |${JSON.stringify(newUser)}|`);
+      const oldUser = new User(result as {[key: string]: unknown}, DataSource.DataStore);
+      console.debug(`Provider based user updated from |${JSON.stringify(oldUser)}| to |${JSON.stringify(newUser)}|`);
 
       /*
-      console.debug(`Creating user history record for |${JSON.stringify(result)}|`);
-      if (before.historyRequired(newUser.toJSON())) {
+      console.debug(`Creating user's history record for |${JSON.stringify(result)}|`);
+      if (oldUser.historyRequired(newUser.toJSON())) {
         console.debug("About to create an instance of the user history record");
         const history = new HistoryImpl(
           "",
-          before.toJSON(),
+          oldUser.toJSON(),
           "update",
           new Date(),
-          req.extendedDecodedIdToken?.uid || ""
+          req?.currentUid || ""
         );
 
         console.debug("About to create an instance of the user history store");
-        const dataStoreHistory = new HistoryDataStore(req.provider?.id as string, HistoryType.user);
+        const dataStoreHistory = new HistoryDataStore(, HistoryType.User);
 
         console.debug("About to add a user history record to firestore");
         const resultHistory = await dataStoreHistory.create(history.dbJSON());
-        console.debug(`User History |${resultHistory}| for user |${userId}| created successfully after user updates`);
+        console.debug(`User History |${resultHistory}| for user |${newUser.id}| created successfully after user updates`);
       }*/
 
       userJson = newUser.toJSON() || {};
@@ -241,7 +251,7 @@ export class UserController {
 
     res.status(200).json({
       status: "Success",
-      message: "user updated successfully",
+      message: "User updated successfully",
       data: userJson,
     });
   }
@@ -261,17 +271,33 @@ export class UserController {
       if (!userId || userId.trim().length === 0) {
         res.status(400).json({
           status: "Failed",
-          message: "user id must be passed",
+          message: "User id must be passed",
           code: ErrorCodes.INVALID_PARAMETERS,
         });
         return;
       }
 
+      const firebaseUserControlller = new FirebaseUserController();
+      const firebaseUser = await firebaseUserControlller.read(userId);
+
       const dataStore = new UserDataStore();
       const result = await dataStore.read(userId);
 
-      const after = new User(result as {[key: string]: unknown});
-      userJson = after.toJSON() || {};
+      let existingUser = new User(result as {[key: string]: unknown}, DataSource.DataStore);
+
+      if (!existingUser.profilePhoto.url) {
+        if ((firebaseUser as {profilePhoto: {url: string}})?.profilePhoto?.url) {
+          existingUser = new User({
+            ...existingUser.toJSON(),
+            profilePhoto: firebaseUser.profilePhoto,
+          });
+
+          // update this user
+          await dataStore.transactionalUpdate(existingUser.id, existingUser.dbJSON());
+        }
+      }
+
+      userJson = existingUser.toJSON() || {};
     } catch (error) {
       console.error(error);
       res.status(400).json({
@@ -279,10 +305,11 @@ export class UserController {
         message: `Error retrieving user |${req.params.id}|. Last Error |${(error as Error).message}|`,
         code: ErrorCodes.UNKNOWN_ERROR,
       });
+      return;
     }
     res.status(200).json({
       status: "Success",
-      message: "user retrieved successfully",
+      message: "User retrieved successfully",
       data: userJson,
     });
   }
@@ -311,10 +338,26 @@ export class UserController {
         );
       }
 
-      userJsons = (result.data || []).map((item) => {
-        const after = new User(item as {[key: string]: unknown});
-        return after.toJSON();
-      }) || [];
+      const firebaseUserControlller = new FirebaseUserController();
+
+      console.log("Data", result.data);
+      userJsons = await Promise.all((result.data || []).map(async (item) => {
+        let existingUser = new User(item as {[key: string]: unknown}, DataSource.DataStore);
+
+        if (!existingUser.profilePhoto.url) {
+          const firebaseUser = await firebaseUserControlller.read(existingUser.id);
+          if ((firebaseUser as {profilePhoto: {url: string}})?.profilePhoto?.url) {
+            existingUser = new User({
+              ...existingUser.toJSON(),
+              profilePhoto: firebaseUser.profilePhoto,
+            });
+
+            // update this user
+            await dataStore.transactionalUpdate(existingUser.id, existingUser.dbJSON());
+          }
+        }
+        return existingUser.toJSON();
+      })) || [];
 
       res.setHeader("X-Content-Range", `items ${result.rangeStart}-${result.rangeEnd}/${result.totalCount}`);
     } catch (error) {
@@ -324,6 +367,7 @@ export class UserController {
         message: `Error retrieving user list: |${(error as Error).message}|`,
         code: ErrorCodes.UNKNOWN_ERROR,
       });
+      return;
     }
 
     // console.debug(`Query executed successfully with data |${JSON.stringify(userJsons)}|`);
@@ -350,7 +394,7 @@ export class UserController {
       if (!userId || userId.trim().length === 0) {
         res.status(400).json({
           status: "Failed",
-          message: "user id must be passed",
+          message: "User id must be passed",
           code: ErrorCodes.INVALID_PARAMETERS,
         });
         return;
@@ -369,27 +413,26 @@ export class UserController {
 
       // Delete the record
       const result = await dataStore.delete(userId);
-      const before = new User(result as {[key: string]: unknown});
-      userJson = before.toJSON();
-
-      console.debug(`User History for user with ID |${before.id}| deleted successfully`);
+      const oldUser = new User(result as {[key: string]: unknown}, DataSource.DataStore);
+      userJson = oldUser.toJSON();
+      console.debug(`Provider based user with ID |${userId}| deleted successfully`);
 
       /*
       // Create a history record for the user deletion
       const history = new HistoryImpl(
         "", // Assuming ID will be auto-generated
-        before.toJSON(),
+        oldUser.toJSON(),
         "update", // Action type
         new Date(),
-        req.extendedDecodedIdToken?.uid || ""
+        req?.currentUid || ""
       );
 
       // Create an instance of history data store
-      const dataStoreHistory = new HistoryDataStore(req.provider?.id as string, HistoryType.user);
+      const dataStoreHistory = new HistoryDataStore(, HistoryType.User);
 
       // Record the deletion in history
       const resultHistory = await dataStoreHistory.create(history.dbJSON());
-      console.debug(`User History |${resultHistory}| for user |${before.id}| created successfully after user deletion`);
+      console.debug(`User History |${resultHistory}| for user |${userId}| created successfully after user deletion`);
       */
     } catch (error) {
       console.error(error);

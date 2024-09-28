@@ -1,6 +1,8 @@
 import {ErrorCodes, ErrorEx} from "../../../types/errorEx";
-import {MultiFactor, IFirebaseUser} from "./firebaseUserInterface";
+import {MultiFactorSettings, PhoneMultiFactorInfo, IFirebaseUser} from "./firebaseUserInterface";
 import {Helper} from "../../../utils/helper";
+import {DataSource} from "../../../types/dataSource";
+
 // import {PhoneMultiFactorGenerator} from "firebase/auth";
 
 
@@ -10,11 +12,12 @@ import {Helper} from "../../../utils/helper";
 export class FirebaseUser implements IFirebaseUser {
   #id: string;
   #emailId: string;
+  #emailVerified: boolean;
   #firstName: string;
   #lastName: string;
   #phoneNumber: string;
 
-  #multiFactorPhoneNumber: string;
+  #multiFactor: MultiFactorSettings;
 
   #profilePhoto: {
     url: string | null;
@@ -24,8 +27,10 @@ export class FirebaseUser implements IFirebaseUser {
   /**
    * Creates an instance of the user class.
    * @param {Object} data {{[key: string]: unknown}} - The user data.
+   * @param {DataSource} dataSource - The data sourced from application or datastore
+   *
    */
-  constructor(data: {[key: string]: unknown}) {
+  constructor(data: {[key: string]: unknown}, dataSource = DataSource.Application) {
     const isValidE164 = (phoneNumber: string): boolean => {
       const e164Regex = /^\+?[1-9]\d{1,14}$/;
       return e164Regex.test(phoneNumber);
@@ -35,59 +40,96 @@ export class FirebaseUser implements IFirebaseUser {
       throw new ErrorEx(ErrorCodes.INVALID_PARAMETERS, `Invalid data |${data}|. Null or undefined data found`);
     }
 
-    // Validate email
-    if ((!(data as { emailId: string }).emailId?.trim()) && (!(data as { email: string }).email?.trim())) {
-      throw new ErrorEx(
-        ErrorCodes.INVALID_PARAMETERS,
-        `Email |${data.email}| or EmailId |${data.emailId}| is required in data |${JSON.stringify(data)}|.`,
-      );
-    }
+    if (dataSource === DataSource.Application) {
+      // Validate email
+      if ((!(data as { emailId: string })?.emailId?.trim())) {
+        console.error(`Invalid data |${JSON.stringify(data)}|`);
+        console.error(` Email id |${data.emailId}| is required.`);
+        throw new ErrorEx(
+          ErrorCodes.INVALID_PARAMETERS,
+          `EmailId |${data.emailId}| is required.`,
+        );
+      }
 
-    // Validate firstName and lastName
-    if ((!(data as { firstName: string }).firstName?.trim() || !(data as { lastName: string }).lastName?.trim()) && !((data as { displayName: string }).displayName?.trim())) {
-      throw new ErrorEx(
-        ErrorCodes.INVALID_PARAMETERS,
-        `Either First name |${data.firstName}| and last name |${data.lastName}| or Display name |${data.displayName}| is required`,
-      );
-    }
+      // Validate firstName and lastName
+      if ((!(data as { firstName: string })?.firstName?.trim() || !(data as { lastName: string })?.lastName?.trim())) {
+        console.error(`Invalid data |${JSON.stringify(data)}|`);
+        console.error(`Both first name |${data.firstName}| and last name |${data.lastName}| are required`);
+        throw new ErrorEx(
+          ErrorCodes.INVALID_PARAMETERS,
+          `Both first name |${data.firstName}| and last name |${data.lastName}| are required`,
+        );
+      }
 
-    if (!(data as { phoneNumber: string }).phoneNumber?.trim() || !isValidE164((data as { phoneNumber: string }).phoneNumber)) {
-      throw new ErrorEx(
-        ErrorCodes.INVALID_PARAMETERS,
-        `Phone Number |${data.phoneNumber}| is required and must be a E.164 complaint phone number.`,
-      );
-    }
-
-    const multiFactor = (data as {multiFactor: MultiFactor}).multiFactor;
-    const multiFactorPhoneNumber = (data as {multiFactorPhoneNumber: string})?.multiFactorPhoneNumber ||
-      multiFactor?.enrollmentFactors[0]?.phoneNumber || (data as {phoneNumber: string})?.phoneNumber;
-
-    if (!multiFactorPhoneNumber) {
-      throw new ErrorEx(
-        ErrorCodes.INVALID_PARAMETERS,
-        `Multi factor phone number is required either in the field multiFactorPhoneNumber |${data.multiFactorPhoneNumber}| ` +
-        `or in the filed phoneNumber |${data.phoneNumber}| multiFactor|${JSON.stringify(multiFactor)}|`,
-      );
+      // Validate phoneNumber
+      if (!(data as { phoneNumber: string })?.phoneNumber?.trim() || !isValidE164((data as { phoneNumber: string })?.phoneNumber)) {
+        console.error(`Invalid data |${JSON.stringify(data)}|`);
+        console.error(`Phone Number |${data.phoneNumber}| is required and must be a E.164 complaint phone number.`);
+        throw new ErrorEx(
+          ErrorCodes.INVALID_PARAMETERS,
+          `Phone Number |${data.phoneNumber}| is required and must be a E.164 complaint phone number.`,
+        );
+      }
+    } else {
+      if (!(data as {uid: string})?.uid?.trim()) {
+        console.error(`Invalid data |${JSON.stringify(data)}|`);
+        console.error(`Id |${data.uid}| is required`);
+        throw new ErrorEx(
+          ErrorCodes.INVALID_PARAMETERS,
+          `Id |${data.uid}| is required`,
+        );
+      }
     }
 
     const record = data;
 
-    this.#id = (record as {id: string}).id || (record as {uid: string}).uid || (record as {emailId: string}).emailId;
-    this.#emailId = (record as {emailId: string}).emailId;
-    this.#firstName = Helper.capitalizedString(
-      (record as {firstName: string}).firstName || Helper.extractFirstName((record as {displayName: string}).displayName)
-    );
-    this.#lastName = Helper.capitalizedString(
-      (record as {lastName: string}).lastName || Helper.extractLastName((record as {displayName: string}).displayName)
-    );
-    this.#phoneNumber = (record as {phoneNumber: string}).phoneNumber;
-    this.#multiFactorPhoneNumber = multiFactorPhoneNumber;
+    this.#id = (dataSource === DataSource.Application) ?
+      (record as {id: string})?.id || (record as {emailId: string})?.emailId :
+      (record as { uid: string })?.uid;
+
+    this.#emailId = (dataSource === DataSource.Application) ?
+      (record as {emailId: string})?.emailId || "":
+      (record as {email: string})?.email || "";
+
+    this.#emailVerified = (record as {emailVerified: boolean})?.emailVerified || false;
+
+    this.#firstName = (dataSource === DataSource.Application) ?
+      Helper.capitalizedString((record as {firstName: string})?.firstName ) || "" :
+      Helper.capitalizedString(Helper.extractFirstName((record as {displayName: string})?.displayName)) || "";
+
+    this.#lastName = (dataSource === DataSource.Application) ?
+      Helper.capitalizedString((record as {lastName: string})?.lastName ) || "" :
+      Helper.capitalizedString(Helper.extractLastName((record as {displayName: string})?.displayName)) || "";
+
+    this.#phoneNumber = (record as {phoneNumber: string})?.phoneNumber || "";
+
+    const multiFactor = (data as { multiFactor: MultiFactorSettings })?.multiFactor;
+    const multiFactorPhoneNumber = (dataSource === DataSource.Application) ?
+      (record as {multiFactorPhoneNumber: string})?.multiFactorPhoneNumber || (record as {phoneNumber: string})?.phoneNumber || "" :
+      (multiFactor && multiFactor?.enrolledFactors && multiFactor?.enrolledFactors?.length > 0 ?
+        multiFactor?.enrolledFactors[0].phoneNumber : "");
+
+    this.#multiFactor = multiFactor && multiFactor?.enrolledFactors && multiFactor?.enrolledFactors?.length > 0 ?
+      {...multiFactor,
+        enrolledFactors: multiFactor.enrolledFactors.map((factor: PhoneMultiFactorInfo, index: number) =>
+          index === 0 ? {...factor, phoneNumber: multiFactorPhoneNumber} : factor
+        ),
+      } :
+      {
+        enrolledFactors: [{
+          phoneNumber: multiFactorPhoneNumber,
+          displayName: "Primary phone number",
+          factorId: "phone", // PhoneMultiFactorGenerator.FACTOR_ID
+        }],
+      };
 
     this.#profilePhoto = {
-      url: (record?.profilePhoto as { url?: string })?.url ??
-        ((record as {profileURL: string}).profileURL ?? null),
-      displayName: ((record?.profilePhoto as { displayName?: string })?.displayName) ??
-        (`${record?.firstName || ""} ${record?.lastName || ""}`.trim() || null),
+      url: (dataSource === DataSource.Application) ?
+        (record?.profilePhoto as { url?: string })?.url ?? null:
+        (record as {photoURL: string})?.photoURL ?? null,
+      displayName: (dataSource === DataSource.Application) ?
+        (record?.profilePhoto as { displayName?: string })?.displayName ?? (`${record?.firstName || ""} ${record?.lastName || ""}`.trim() ?? null):
+        ((record as { displayName?: string })?.displayName) ?? null,
     };
   }
 
@@ -107,6 +149,15 @@ export class FirebaseUser implements IFirebaseUser {
    */
   get emailId(): string {
     return this.#emailId;
+  }
+
+  /**
+   * Flag indicating if the email is verified
+   *
+   * @type {boolean}
+   */
+  get emailVerified(): boolean {
+    return this.#emailVerified;
   }
 
   /**
@@ -135,12 +186,15 @@ export class FirebaseUser implements IFirebaseUser {
     return this.#phoneNumber;
   }
 
+
   /**
-   * Gets the second phone number used as a backup multi factor autnetication option
-   * @type {string}
+   * The user's phone number iused for multi factor authntication, if not defined user';s phone number is used
+   *
+   * @type {string| null}
    */
   get multiFactorPhoneNumber(): string {
-    return this.#multiFactorPhoneNumber;
+    return (this.#multiFactor?.enrolledFactors && this.#multiFactor?.enrolledFactors.length > 0) ?
+      (this.#multiFactor?.enrolledFactors[0] as PhoneMultiFactorInfo).phoneNumber : this.#phoneNumber || "";
   }
 
   /**
@@ -198,20 +252,27 @@ export class FirebaseUser implements IFirebaseUser {
 
     // Destructure the `id` field out and return the rest
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const {id, emailId, firstName, lastName, phoneNumber, multiFactorPhoneNumber, profilePhoto} = fullJson;
+    const {id, emailId, firstName, lastName, phoneNumber, multiFactorPhoneNumber, profilePhoto, ...rest} = fullJson;
 
-    const multiFactor = {
-      enrollmentFactors: [{
-        phoneNumber: multiFactorPhoneNumber || phoneNumber,
-        displayName: "Primary phone number",
-        factorId: "phone", // PhoneMultiFactorGenerator.FACTOR_ID,
-      }],
-    };
+    const multiFactor = this.#multiFactor && this.#multiFactor?.enrolledFactors && this.#multiFactor?.enrolledFactors?.length > 0 ?
+      {...this.#multiFactor,
+        enrolledFactors: this.#multiFactor.enrolledFactors.map((factor: PhoneMultiFactorInfo, index: number) =>
+          index === 0 ? {...factor, phoneNumber: multiFactorPhoneNumber} : factor
+        ),
+      } :
+      {
+        enrolledFactors: [{
+          phoneNumber: multiFactorPhoneNumber,
+          displayName: "Primary phone number",
+          factorId: "phone", // PhoneMultiFactorGenerator.FACTOR_ID
+        }],
+      };
 
     const profileURL = (profilePhoto as {url: string})?.url?.trim() || null;
 
-    // Return the JSON object excluding the `id` field
-    return {email: emailId, displayName: `${firstName} ${lastName}`, phoneNumber, multiFactor,
+    // Return the JSON object excluding the `id` field and rebuildin some other properties
+    return {email: emailId, displayName: `${firstName} ${lastName}`, phoneNumber,
+      multiFactor, ...rest,
       ...(profileURL ? {profileURL} : {}),
     };
   }
@@ -220,18 +281,18 @@ export class FirebaseUser implements IFirebaseUser {
    * Determines whether the key properties of a user object have been modified compared to a previous state.
    * Forces saving a history of the current record if changes are detected.
    *
-   * @param {Object.<string, unknown>} after - The previous state of the fcm token object to compare against.
-   * @return {boolean} - Returns true if the user object has changes; otherwise, false.
+   * @param {Object.<string, unknown>} after - The previous state of the user object to compare against.
+   * @return {boolean} Returns true if the user object has changes; otherwise, false.
    */
-  historyRequired(after: {[key: string]: unknown}): boolean {
-  // Ensure that all keys are checked and compared correctly
+  historyRequired(after: { [key: string]: unknown }): boolean {
+    // Ensure that all keys are checked and compared correctly
     return (
       this.#id !== after.id ||
       this.#emailId !== after.emailId ||
       // this.#firstName !== after.firstName ||
       // this.#lastName !== after.lastName ||
       this.#phoneNumber !== after.phoneNumber ||
-      this.#multiFactorPhoneNumber !== after.multiFactorPhoneNumber // ||
+      this.multiFactorPhoneNumber === after.multiFactorPhoneNumber // ||
       // this.profilePhoto.url !== after.profilePhoto.url ||
       // this.profilePhoto.displayName !== after.profilePhoto.displayName ||
     );

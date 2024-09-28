@@ -10,7 +10,7 @@ export const ErrorCodes = {
   SESSION_COOKIE_MISSING_CSRF_COOKIE: "luxe-suite/session-cookie-missing-csrf-cookie",
   SESSON_COOKIE_FAILED_VERIFY: "luxe-suite/session-cookie-failed-verify",
   AUTH_FAILURE: "luxe-suite/auth-failure",
-  AUTH_UID_EMAIL_MISMATCHED: "luxe-suite/auth-uid-emailId-mismatched",
+  AUTH_UID_EMAIL_MISMATCHED: "luxe-suite/auth-uid-email-mismatched",
   AUTH_MISSING_CREDENTIALS: "luxe-suite/auth-missing-credential",
   AUTH_REAUTHENTICATION_REQUIRED: "luxe-suite/auth-reauthentication-required",
   CSRF_TOKEN_FUNCTION_MISSING: "luxe-suite/csfr-token-function-missing",
@@ -33,6 +33,8 @@ export const ErrorCodes = {
   RECORD_ALREADY_EXIST: "luxe-studio/record-already-exist",
   RECORD_NOT_FOUND: "luxe-studio/record-not-found",
   PROVIDER_ID_FAILURE: "luxe-suite/provider-id-failure",
+
+  EMAIL_FAILED: "luxe-suite/email-failed",
 };
 
 /**

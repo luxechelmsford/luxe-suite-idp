@@ -1,5 +1,5 @@
 import * as functions from "firebase-functions";
-import {auth, defaultRegion} from "../configs/firebase"; // Import auth from configs/firebase
+import {defaultRegion} from "../configs/firebase"; // Import auth from configs/firebase
 import {FirestorePathBuilder} from "../dataStores/models/firestorePathBuilder";
 import {CustomClaims} from "../middlewares/customClaims";
 import {UserDataStore} from "../dataStores/collections/userDataStore";
@@ -137,6 +137,7 @@ export const onUserWritten = functions.region(defaultRegion).firestore
  * 'gmail.com' or 'googlemail.com' or if there is an error during the checks.
  */
 const googleAccountExist = async (emailId: string): Promise<string> => {
+  /*
   const accountName = emailId ? emailId.split("@")[0] : "";
   const gmailEmail = `${accountName}@gmail.com`;
   const googlemailEmail = `${accountName}@googlemail.com`;
@@ -166,7 +167,7 @@ const googleAccountExist = async (emailId: string): Promise<string> => {
     }
     console.log(`Account with email ${googlemailEmail} does not exist`, error);
   }
-
+  */
   console.log(`No acount for email ${emailId} found`);
   return "";
 };

@@ -6,8 +6,7 @@ import * as admin from "firebase-admin";
 import {ServiceAccount} from "firebase-admin";
 import idpServiceAccount from "./idpServiceAccountKey.json";
 const localServiceAccount = {};
-import gmailServiceAccount from "../configs/gmailServiceAccountKey.json";
-import {google} from "googleapis";
+import gsuiteServiceAccount from "../configs/gsuiteServiceAccountKey.json";
 
 const appName = "";
 const idpAppName = "idpApp";
@@ -83,16 +82,12 @@ firestore.settings({
   // Add more settings if needed for Simsilat convention
 });
 
-// Initialize OAuth2 client
-export const oAuth2Client = new google.auth.OAuth2(
-  gmailServiceAccount.web.client_id,
-  gmailServiceAccount.web.client_secret,
-  "https://core.theluxestudio.co.uk" // Redirect URI
-);
-// Set refresh token
-oAuth2Client.setCredentials({
-  refresh_token: gmailServiceAccount.web.refresh_token,
-});
+// GSuite configs
+export const luxeSuiteNoRelyEmailId = "donotreply@theluxestudio.co.uk";
+export const luxeSuiteAdminEmailId = "info@theluxestudio.co.uk";
+export const luxeSuiteProviderEmailId = "info@theluxestudio.co.uk";
+export const gsuiteServiceAccountEmail = gsuiteServiceAccount.client_email;
+export const gsuiteServiceAccountPrivateKey = gsuiteServiceAccount.private_key;
 /*
  * do not copy thos accross the various projects - end
  *

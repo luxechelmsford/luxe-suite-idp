@@ -1,13 +1,32 @@
-// import {RelatedEntities} from "./relatedEntities";
 
+export type PhoneMultiFactorInfo = {
+  /**
+   * The ID of the enrolled second factor. This ID is unique to the user.
+   */
+  uid?: string;
+  /**
+   * The type identifier of the second factor.
+   * For SMS second factors, this is `phone`.
+   * For TOTP second factors, this is `totp`.
+   */
+  factorId: string;
+  /**
+   * The phone number associated with a phone second factor.
+   */
+  phoneNumber: string;
+  /**
+   * The optional display name of the enrolled second factor.
+   */
+  displayName?: string;
+}
 
-export type MultiFactor = {
-  enrollmentFactors: [{
-    phoneNumber: string, //  E.164 standard compliant identifier string.
-    displayName: string,
-    factorId: string, // defaults to phone
-  }],
-};
+export type MultiFactorSettings = {
+  /**
+   * List of second factors enrolled with the current user.
+   * Currently only phone and TOTP second factors are supported.
+   */
+  enrolledFactors: PhoneMultiFactorInfo[];
+}
 
 /**
  * Represents a user with personal and consent information.
@@ -26,6 +45,13 @@ export interface IFirebaseUser {
    * @type {string}
    */
   emailId: string;
+
+  /**
+   * Flag indicating if the email is verified
+   *
+   * @type {boolean}
+   */
+  emailVerified: boolean;
 
   /**
    * The user's first name.
@@ -47,6 +73,7 @@ export interface IFirebaseUser {
    * @type {string}
    */
   phoneNumber: string;
+
 
   /**
    * The user's phone number iused for multi factor authntication, if not defined user';s phone number is used

@@ -1,6 +1,7 @@
 import {ErrorCodes, ErrorEx} from "../../types/errorEx";
 import {IUser} from "./userInterface";
 import {Helper} from "../../utils/helper";
+import {DataSource} from "../../types/dataSource";
 
 
 /**
@@ -32,42 +33,64 @@ export class User implements IUser {
   /**
    * Creates an instance of the user class.
    * @param {Object} data {{[key: string]: unknown}} - The user data.
+   * @param {DataSource} dataSource - The data sourced from application or datastore
+   *
    */
-  constructor(data: {[key: string]: unknown}) {
+  constructor(data: {[key: string]: unknown}, dataSource = DataSource.Application) {
     if (data == null) {
       throw new ErrorEx(ErrorCodes.INVALID_PARAMETERS, `Invalid data |${data}|. Null or undefined data found`);
     }
 
-    // Validate email
-    if (!(data as { emailId: string }).emailId?.trim()) {
-      throw new ErrorEx(
-        ErrorCodes.INVALID_PARAMETERS,
-        `Email |${data.emailId}| is required.`,
-      );
-    }
+    if (dataSource === DataSource.Application) {
+      // Validate email
+      if (!(data as { emailId: string })?.emailId?.trim()) {
+        console.error(`Invalid data |${JSON.stringify(data)}|`);
+        console.error(`Email |${data.emailId}| is required.`);
+        throw new ErrorEx(
+          ErrorCodes.INVALID_PARAMETERS,
+          `Email |${data.emailId}| is required.`,
+        );
+      }
 
-    // Validate firstName and lastName
-    if ((!(data as { firstName: string }).firstName?.trim() || !(data as { lastName: string }).lastName?.trim()) && !((data as { fullName: string }).fullName?.trim())) {
-      throw new ErrorEx(
-        ErrorCodes.INVALID_PARAMETERS,
-        `Either First name |${data.firstName}| and last name |${data.lastName}| or Full name |${data.fullName}| is required`,
-      );
+      // Validate firstName and lastName
+      if ((!(data as { firstName: string })?.firstName?.trim() || !(data as { lastName: string })?.lastName?.trim())) {
+        console.error(`Invalid data |${JSON.stringify(data)}|`);
+        console.error(`Both first name |${data.firstName}| and last name |${data.lastName}| are required`);
+        throw new ErrorEx(
+          ErrorCodes.INVALID_PARAMETERS,
+          `Both first name |${data.firstName}| and last name |${data.lastName}| are required`,
+        );
+      }
+    } else {
+      if (!(data as {id: string})?.id?.trim()) {
+        console.error(`Invalid data |${JSON.stringify(data)}|`);
+        console.error(`Id |${data.id}| is required`);
+        throw new ErrorEx(
+          ErrorCodes.INVALID_PARAMETERS,
+          `Id |${data.id}| is required`,
+        );
+      }
     }
 
     const record = data;
 
+    this.#id = (dataSource === DataSource.Application) ?
+      (record as {id: string})?.id || (record as { email: string })?.email :
+      (record as { id: string })?.id;
 
-    this.#id = (record as {id: string}).id;
     this.#emailId = (record as {emailId: string}).emailId;
-    this.#firstName = Helper.capitalizedString(((record as {firstName: string}).firstName || Helper.extractFirstName(record.fullName as string))) || "";
-    this.#lastName = Helper.capitalizedString(((record as {lastName: string}).lastName || Helper.extractLastName(record.fullName as string))) || "";
+    this.#firstName = Helper.capitalizedString((record as {firstName: string})?.firstName ) || "";
+    this.#lastName = Helper.capitalizedString((record as {lastName: string})?.lastName ) || "";
+
     this.#superAdmin = (record as {superAdmin: boolean}).superAdmin || false;
 
     this.#profilePhoto = {
-      url: (record?.profilePhoto as { url?: string })?.url ??
-        ((record as {profileURL: string}).profileURL ?? null),
-      displayName: ((record?.profilePhoto as { displayName?: string })?.displayName) ??
-        (`${record?.firstName || ""} ${record?.lastName || ""}`.trim() || null),
+      url: (dataSource === DataSource.Application) ?
+        (record?.profilePhoto as { url?: string })?.url ?? null:
+        (record?.profilePhoto as { url?: string })?.url ?? (record as {profileURL: string})?.profileURL ?? null,
+      displayName: (dataSource === DataSource.Application) ?
+        ((record?.profilePhoto as { displayName?: string })?.displayName) ?? (`${record?.firstName || ""} ${record?.lastName || ""}`.trim()) ?? null:
+        ((record?.profilePhoto as { displayName?: string })?.displayName) ?? null,
     };
 
     this.#profileColour = (record as { profileColour?: string | null }).profileColour || null;
