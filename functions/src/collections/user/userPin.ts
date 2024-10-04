@@ -2,6 +2,7 @@
 // import {RelatedEntities} from "../interfaces/relatedEntities";
 import crypto from "crypto";
 import {ErrorCodes, ErrorEx} from "../../types/errorEx";
+import {DataSource} from "../../types/dataSource";
 
 
 /**
@@ -14,8 +15,9 @@ export class UserPin {
   /**
    * Creates an instance of the user class.
    * @param {Object} data {{[key: string]: unknown}} - The user data.
+   * @param {DataSource} dataSource - The data sourced from application or datastore
    */
-  constructor(data: {[key: string]: unknown}) {
+  constructor(data: {[key: string]: unknown}, dataSource = DataSource.Application) {
     if (data == null) {
       throw new ErrorEx(ErrorCodes.INVALID_PARAMETERS, `Invalid data |${data}|. Null or undefined data found`);
     }
@@ -27,10 +29,24 @@ export class UserPin {
       );
     }
 
-    if (!(data as { emailId: string }).emailId?.trim()) {
+    if (dataSource === DataSource.Application) {
+      // Validate pin
+      if (!(data as { pin: string })?.pin?.trim()) {
+        console.error(`Invalid data |${JSON.stringify(data)}|`);
+        console.error(`Pin |${data.pin}| is required.`);
+        throw new ErrorEx(
+          ErrorCodes.INVALID_PARAMETERS,
+          `Email |${data.emailId}| is required.`,
+        );
+      }
+    }
+
+    if (!(data as {id: string})?.id?.trim()) {
+      console.error(`Invalid data |${JSON.stringify(data)}|`);
+      console.error(`Id |${data.id}| is required`);
       throw new ErrorEx(
         ErrorCodes.INVALID_PARAMETERS,
-        `Email |${data.emailId}| is required.`,
+        `Id |${data.id}| is required`,
       );
     }
 

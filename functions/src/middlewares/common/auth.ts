@@ -7,6 +7,7 @@ import {SessionCookie} from "./sessionCookie";
 import {Fqdn} from "../../utils/fqdn";
 import {doubleCsrf} from "csrf-csrf";
 import {Provider} from "../provider";
+import {SessionType} from "../../types/customClaimsInterface";
 
 /**
  * @class Auth
@@ -170,8 +171,8 @@ export class Auth {
   static async verifyIdToken(req: Request, res: Response, next: NextFunction) {
     // console.debug(`In verifyIdToken with headers |${JSON.stringify(req?.headers)}|`);
 
-    let extendedDecodedIdToken: IExtendedDecodedIdToken;
-    let currentUid: string;
+    let extendedDecodedIdToken: IExtendedDecodedIdToken | undefined = undefined;
+    // console.debug("In verifyIdToken");
 
     // Check if Authorization header is present and properly formatted
     if (!SessionCookieOnlyMode && req.headers.authorization && req.headers.authorization.startsWith("Bearer ")) {
@@ -192,7 +193,6 @@ export class Auth {
         // Verify the ID Token
         console.log(`Decoding id token: |${idToken}|`);
         extendedDecodedIdToken = await auth.verifyIdToken(idToken) as IExtendedDecodedIdToken;
-        currentUid = extendedDecodedIdToken.uid;
         console.log("ID Token correctly decoded", extendedDecodedIdToken);
       } catch (error) {
         console.error("Error while verifying Firebase ID token from Authorization header:", error);
@@ -221,13 +221,13 @@ export class Auth {
         return;
       }
 
-      const idTokenCookie = __session?.loggedInUser?.idTokenCookie;
+      const idTokenCookie = __session?.idTokenCookie;
       if (!idTokenCookie) {
         // Handle missing token in session cookie
-        console.error(`No Firebase token found in the logged in user property |${JSON.stringify(__session?.loggedInUser)}| of the Session cookie`);
+        console.error(`No Firebase token found in the logged in user property |${JSON.stringify(__session?.idTokenCookie)}| of the Session cookie`);
         res.status(403).json({
           status: "Failed",
-          message: `Logged in user |${__session?.currentUid}| missing in logged in user property of the |${__session?.loggedInUser}| of the session cookie`,
+          message: `Logged in user |${__session?.currentUid}| missing in logged in user property of the |${__session?.idTokenCookie}| of the session cookie`,
           code: ErrorCodes.SESSION_COOKIE_MISSING_LOGGED_IN_USER,
         });
         return;
@@ -239,7 +239,6 @@ export class Auth {
       try {
         // Verify the session cookie
         extendedDecodedIdToken = await auth.verifySessionCookie(idTokenCookie, true /** checkRevoked */) as IExtendedDecodedIdToken;
-        currentUid = __session?.currentUid;
         // console.log("ID token correctly decoded", extendedDecodedIdToken);
       } catch (error) {
         console.error("Error while verifying Firebase session cookie:", error);
@@ -276,7 +275,6 @@ export class Auth {
 
     // Attach the decoded token to the request
     req.extendedDecodedIdToken = extendedDecodedIdToken;
-    req.currentUid = currentUid;
     // console.debug(`Decoded ID Token |${JSON.stringify(req.extendedDecodedIdToken)}| attached to the request`);
 
     // Proceed to the next middleware
@@ -400,6 +398,8 @@ export class Auth {
           id: providerId,
           roles: [],
           accessLevel: 0,
+          sessionType: SessionType.personal,
+          assignedUsers: [],
         };
         /*
         console.debug(`User does not have access to resources of this provider |${providerId}|`),
@@ -479,8 +479,8 @@ export class Auth {
               "Access denied: You do not have the required access level to access this function."
             );
           }
-        } else if (requiredRoles !== null && requiredRoles.length > 1) {
-          if ((!requiredRoles || requiredRoles.length === 0) || (requiredRoles.length > 0 && currentUserRoles.some((role) => requiredRoles.includes(role)))) {
+        } else {
+          if ((!requiredRoles || requiredRoles.length === 0) || (requiredRoles.length > 0 && currentUserRoles.some((role: string) => requiredRoles.includes(role)))) {
             return originalMethod.apply(this, [request, ...args]);
           } else {
             throw new ErrorEx(
@@ -488,9 +488,6 @@ export class Auth {
               "Access denied: You do not have the required role(s) to access this function."
             );
           }
-        } else {
-          // no access control required
-          return originalMethod.apply(this, [request, ...args]);
         }
       };
 

@@ -8,6 +8,7 @@ import {FirebaseError} from "firebase-admin";
 import {FirebaseUserController} from "./firebaseUser/firebaseUserController";
 import {user} from "firebase-functions/v1/auth";
 import {DataSource} from "../../types/dataSource";
+import {UserPin} from "./userPin";
 
 /**
  * Handles user related operations.
@@ -448,6 +449,86 @@ export class UserController {
       status: "Success",
       message: "User deleted successfully",
       data: userJson,
+    });
+  }
+
+
+  /**
+   * Deletes a user by ID.
+   * @param {Request} req - The HTTP request object.
+   * @param {Response} res - The HTTP response object.
+   * return {Promise<void>}
+   */
+  @Auth.requiresRoleOrAccessLevel(null, 1, [])
+  public async verifyPin(req: Request, res: Response): Promise<void> {
+    let userJson: {[key: string]: unknown} = {};
+    let validPin = false;
+    try {
+      const userId = req.params.id;
+
+      if (!userId || userId.trim().length === 0) {
+        res.status(400).json({
+          status: "Failed",
+          message: "User id must be passed",
+          code: ErrorCodes.INVALID_PARAMETERS,
+        });
+        return;
+      }
+
+      // Check if the 'data' node exists
+      const {data} = req.body;
+      if (!data) {
+        res.status(400).json({
+          status: "Failed",
+          message: `Data |${req.body.data}| is required.`,
+          code: ErrorCodes.INVALID_PARAMETERS,
+        });
+        return;
+      }
+
+      if (!data?.pin || data?.pin?.trim().length === 0) {
+        res.status(400).json({
+          status: "Failed",
+          message: "User PIN must be passed",
+          code: ErrorCodes.INVALID_PARAMETERS,
+        });
+        return;
+      }
+
+      // Create an instance of user data store
+      const dataStore = new UserDataStore();
+
+      // Delete the record
+      const result = await dataStore.read(userId);
+      const existingUser = new User(result as {[key: string]: unknown}, DataSource.DataStore);
+      userJson = existingUser.toJSON();
+
+      if (!userJson.pin) {
+        console.error(`Non pin |${userJson.pin}| is set`);
+        res.status(400).json({
+          status: "Failed",
+          message: "User PIN is not set",
+          code: ErrorCodes.INVALID_DATA,
+        });
+        return;
+      }
+
+      const userPin = new UserPin(userJson);
+      validPin = await userPin.verifyPin(data?.pin);
+    } catch (error) {
+      console.error(error);
+      res.status(400).json({
+        status: "Failed",
+        message: `Error deleting user |${req.params.id}|. Last Error |${(error as Error).message}|`,
+        code: ErrorCodes.UNKNOWN_ERROR,
+      });
+      return;
+    }
+
+    res.status(200).json({
+      status: "Success",
+      message: validPin ? "User PIN validated successfully" : "User PIN failed validation",
+      data: {validPin},
     });
   }
 }

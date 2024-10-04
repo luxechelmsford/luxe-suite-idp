@@ -1,6 +1,6 @@
-import {auth} from "../../configs/firebase";
 import {CookieOptions} from "express";
 import {ErrorCodes, ErrorEx} from "../../types/errorEx";
+import {AssignedUser} from "../../types/customClaimsInterface";
 
 
 /**
@@ -9,11 +9,8 @@ import {ErrorCodes, ErrorEx} from "../../types/errorEx";
 export type SessionCookieOptions = {
   currentUid?: string; // Optional, defaults to blank
   csrfCookie?: string; // Optional, defaults to blank
+  idTokenCookie?: string; // Optional, defaults to blank
   issueTimestamp?: number; // Optional, default to current timestamp if not provided
-  loggedInUser?: {
-    uid: string;
-    idTokenCookie: string;
-  }; // Optional, default to empty array if not provided
   maxAge?: number; // Optional, default to default expiration time if not provided
 };
 
@@ -23,12 +20,9 @@ export type SessionCookieOptions = {
 export class SessionCookie {
   #currentUid: string;
   #csrfCookie: string;
+  #idTokenCookie: string;
   #issueTimestamp: number;
   #maxAge: number;
-  #loggedInUser: {
-    uid: string;
-    idTokenCookie: string;
-  };
 
   // Define constants
   static DEFAULT_MAX_AGE = 60 * 60 * 24 * 5 * 1000; // 5 days in milliseconds
@@ -43,9 +37,9 @@ export class SessionCookie {
   constructor(options: SessionCookieOptions) {
     this.#currentUid = options.currentUid || ""; // Mandatory
     this.#csrfCookie = options.csrfCookie || ""; // Mandatory
+    this.#idTokenCookie = options.idTokenCookie || ""; // optional
     this.#issueTimestamp = /* options.issueTimestamp ?? */ SessionCookie.DEFAULT_TIMESTAMP; // Default to now
     this.#maxAge = options.maxAge ?? SessionCookie.DEFAULT_MAX_AGE; // Default expiration time if not provided
-    this.#loggedInUser = options.loggedInUser ?? {uid: "", idTokenCookie: ""}; // Default to empty array if not provided
   }
 
   /** Gets the current UID from the session cookie.
@@ -64,7 +58,15 @@ export class SessionCookie {
   }
 
   /**
-   * Gets the issue timestamp from the session cookie.
+   * Gets the token id cookie from the session cookie.
+   * @return {string} The token id.
+   */
+  get idTokenCookie(): string {
+    return this.#idTokenCookie;
+  }
+
+  /**
+   * Gets the issue timestamp stored in the session cookie.
    * @return {number} The issue timestamp.
    */
   get issueTimestamp(): number {
@@ -72,19 +74,11 @@ export class SessionCookie {
   }
 
   /**
-   * Gets the logged-in users from the session cookie.
-   * @return {number} A read-only array of logged-in users.
+   * Gets the max age stored in the session cookie.
+   * @return {number} A read-only array of store users.
    */
   get maxAge(): number {
     return this.#maxAge;
-  }
-
-  /**
-   * Gets the logged-in users from the session cookie.
-   * @return {string} A read-only array of logged-in users.
-   */
-  get loggedInUser(): {uid: string, idTokenCookie: string} {
-    return this.#loggedInUser;
   }
 
   /**
@@ -95,9 +89,9 @@ export class SessionCookie {
     return JSON.stringify({
       currentUid: this.#currentUid,
       csrfCookie: this.#csrfCookie,
+      idTokenCookie: this.#idTokenCookie,
       issueTimestamp: this.#issueTimestamp,
       maxAge: this.#maxAge,
-      loggedInUser: this.#loggedInUser,
     });
   }
 
@@ -114,8 +108,8 @@ export class SessionCookie {
     return {
       currentUid: parsed.currentUid || "",
       csrfCookie: parsed.csrfCookie || "",
+      idTokenCookie: parsed.idTokenCookie || "",
       issueTimestamp: parsed.issueTimestamp || new Date().getTime(),
-      loggedInUser: parsed.loggedInUser || {uid: "", idTokenCookie: ""},
       maxAge: parsed.maxAge || SessionCookie.DEFAULT_MAX_AGE,
     };
   }
@@ -148,33 +142,41 @@ export class SessionCookie {
   /**
    * Switches the current user to a new user identified by the given UID.
    *
-   * This method checks if the user with the specified UID exists in the `loggedInUsers` list.
+   * This method checks if the user with the specified UID exists in the `assignedUsers` list.
    * If the user exists, it sets the `currentUid` to this UID. If the user does not exist, an error is thrown.
    *
    * @param {string} uid - The UID of the user to switch to.
+   * @param {string[]} assignedUsers - The array of users this store login is assigned to (coming from cusotm claims).
    * @return {void}
-   * @throws {Error} Throws an error if the UID is not present in the `loggedInUsers` list.
+   * @throws {Error} Throws an error if the UID is not present in the `assignedUsers` list.
    */
-  async switchCurrentUid(uid: string): Promise<void> {
+  async switchCurrentUid(uid: string, assignedUsers: AssignedUser[]): Promise<void> {
     // Retrieve the ID token associated with the UID
-    if (!this.#loggedInUser.idTokenCookie) {
+    /*
+    if (!this.#storeUser.idTokenCookie) {
       throw new ErrorEx(
         ErrorCodes.SESSION_COOKIE_MISSING_CURRENT_UID,
-        `Id Token Cookie missing from the logged in user |${JSON.stringify(this.#loggedInUser)}|.`,
+        `Id Token Cookie missing from the logged in user |${JSON.stringify(this.#storeUser)}|.`,
       );
     }
 
     // Verify the token
     try {
-      await auth.verifyIdToken(this.#loggedInUser.idTokenCookie);
+      await auth.verifyIdToken(this.#storeUser.idTokenCookie);
     } catch (error) {
       throw new ErrorEx(
         ErrorCodes.SESSON_COOKIE_FAILED_VERIFY,
-        `Failed to verify session cookie for the currently logged in user |${JSON.stringify(this.#loggedInUser)}|. Please re-authenticate.`,
+        `Failed to verify session cookie for the currently logged in user |${JSON.stringify(this.#storeUser)}|. Please re-authenticate.`,
+      );
+    }*/
+
+    const index = assignedUsers.findIndex((storeUser) => storeUser.uid === uid);
+    if (index === -1) {
+      throw new ErrorEx(
+        ErrorCodes.SESSION_COOKIE_CURRENT_UID_NOT_FOUND,
+        `User Id |${uid}| not found in the allowed store Id list |${JSON.stringify(assignedUsers)}|.`,
       );
     }
-
-    this.#currentUid = uid;
 
     // adjust maxAge
     const currentTimestamp = new Date().getTime();
@@ -182,9 +184,9 @@ export class SessionCookie {
   }
 
   /**
-   * Adds or updates a logged-in user by creating or updating their session cookie.
+   * Adds or updates a store user by creating or updating their session cookie.
    *
-   * This method first creates a session cookie using the provided `idToken` and then updates the list of logged-in users.
+   * This method first creates a session cookie using the provided `idToken` and then updates the list of store users.
    * If a user with the given UID already exists, their session cookie is updated; otherwise, the user is added to the list.
    *
    * @param {string} uid - The UID of the user to add or update.
@@ -193,26 +195,26 @@ export class SessionCookie {
    * @throws {Error} Throws an error if creating the session cookie fails.
    */
   /*
-  async addOrUpdateLoggedInUser(uid: string, idToken: string): Promise<void> {
-    console.debug(`In addOrUpdateLoggedInUser: |${uid}| & |${idToken}|`);
+  async addOrUpdateStoreUser(uid: string, idToken: string): Promise<void> {
+    console.debug(`In addOrUpdateStoreUser: |${uid}| & |${idToken}|`);
     try {
       const idTokenCookie = await auth.createSessionCookie(idToken, {expiresIn: this.maxAge});
       console.debug(`In idTokenCookie: |${idTokenCookie}|`);
 
       // Check if user already exists
-      const index = this.loggedInUsers.findIndex((user) => user.uid === uid);
+      const index = this.assignedUsers.findIndex((user) => user.uid === uid);
       console.debug(`In index: |${index}|`);
 
       if (index !== -1) {
       // User exists, update their idTokenCookie
         console.debug(`updating users: |${index}|`);
-        this.#loggedInUsers[index] = {uid, idTokenCookie};
-        console.debug("loggedInUsers: |", this.#loggedInUsers, "|");
+        this.#assignedUsers[index] = {uid, idTokenCookie};
+        console.debug("assignedUsers: |", this.#assignedUsers, "|");
       } else {
         // User does not exist, add them to the list
         console.debug(`Adding users: |${index}|`);
-        this.#loggedInUsers.push({uid, idTokenCookie});
-        console.debug("loggedInUsers: |", this.#loggedInUsers, "|");
+        this.#assignedUsers.push({uid, idTokenCookie});
+        console.debug("assignedUsers: |", this.#assignedUsers, "|");
       }
 
       // set the currentUId to the passed user
@@ -225,17 +227,17 @@ export class SessionCookie {
   /**
    * Switches the current user to a new user identified by the given UID.
    *
-   * This method checks if the user with the specified UID exists in the `loggedInUsers` list.
+   * This method checks if the user with the specified UID exists in the `assignedUsers` list.
    * If the user exists, it sets the `currentUid` to this UID. If the user does not exist, an error is thrown.
    *
    * @param {string} uid - The UID of the user to switch to.
    * @return {void}
-   * @throws {Error} Throws an error if the UID is not present in the `loggedInUsers` list.
+   * @throws {Error} Throws an error if the UID is not present in the `assignedUsers` list.
    */
   /*
-  async switchLoggedInUser(uid: string): Promise<void> {
+  async switchStoreUser(uid: string): Promise<void> {
     // Retrieve the ID token associated with the UID
-    const idTokenCookie = this.#loggedInUsers.find((item: {uid: string, idTokenCookie: string}) => item.uid === uid)?.idTokenCookie || "";
+    const idTokenCookie = this.#assignedUsers.find((item: {uid: string, idTokenCookie: string}) => item.uid === uid)?.idTokenCookie || "";
     if (!idTokenCookie) {
       throw new ErrorEx(
         ErrorCodes.SESSION_COOKIE_MISSING_CURRENT_UID,
@@ -261,16 +263,16 @@ export class SessionCookie {
   }*/
 
   /**
-   * Removes a logged-in user by their UID.
+   * Removes a store user by their UID.
    *
-   * This method filters out the user with the specified UID from the list of logged-in users.
+   * This method filters out the user with the specified UID from the list of store users.
    * The user will no longer be part of the session data.
    *
    * @param {string} uid - The UID of the user to remove.
    * @return {void}
    */
   /*
-  async removeLoggedInUser(uid: string) {
+  async removeStoreUser(uid: string) {
     if (this.#currentUid != uid) {
       throw new ErrorEx(
         ErrorCodes.INVALID_PARAMETERS,
@@ -278,10 +280,10 @@ export class SessionCookie {
       );
     }
 
-    this.#loggedInUsers = this.loggedInUsers.filter((user) => user.uid !== uid);
+    this.#assignedUsers = this.assignedUsers.filter((user) => user.uid !== uid);
     this.#currentUid = "";
 
-    if (this.#loggedInUsers.length === 0) {
+    if (this.#assignedUsers.length === 0) {
       this.#maxAge = -1;
     }
   }*/

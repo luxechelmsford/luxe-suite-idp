@@ -1,7 +1,7 @@
 import {ErrorCodes, ErrorEx} from "../types/errorEx";
 import {auth} from "../configs/firebase";
-import {compareObjects} from "../utils/arrayUtils";
-import {ICustomClaims} from "../types/extendedTypes";
+import {compareObjects} from "../utils/compare";
+import {ICustomClaims} from "../types/customClaimsInterface";
 
 
 /**
